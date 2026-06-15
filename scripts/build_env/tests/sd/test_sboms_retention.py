@@ -13,6 +13,15 @@ from scripts.build_env.tests.base_test import BaseTest
 FEATURE_TEST_DIR = "test_handle_sboms"
 
 
+def _write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
+def _files(directory: Path) -> list[str]:
+    return [f.name for f in directory.iterdir() if f.is_file()]
+
+
 def _files_by_mtime(app_dir: Path) -> list[str]:
     """Return filenames sorted oldest→newest by mtime."""
     files = [f for f in app_dir.iterdir() if f.is_file()]
@@ -298,3 +307,89 @@ class TestSbomMigration(BaseTest):
         remaining = list(app_a_dir.iterdir())
         assert len(remaining) == 3, \
             f"per-app files must not be deleted when already in new layout;\n{_dump_dir(app_a_dir)}"
+
+
+class TestSbomRetentionBackwardCompat(BaseTest):
+    """Backward compatibility: old/incomplete config shapes must not crash the policy."""
+
+    def setup_method(self):
+        self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "backward_compat"
+        self.feature_dir.mkdir(parents=True, exist_ok=True)
+        self.set_ci_project_dir(self.feature_dir)
+
+    def _prepare(self, name: str) -> tuple[Path, Path]:
+        case_dir = self.feature_dir / name
+        if case_dir.exists():
+            shutil.rmtree(case_dir)
+        case_dir.mkdir(parents=True)
+        self.set_ci_project_dir(case_dir)
+        sboms_dir = case_dir / "sboms"
+        sboms_dir.mkdir()
+        return case_dir, sboms_dir
+
+    def test_no_config_file_disables_policy(self, caplog):
+        # Old repos may have no configuration/config.yml at all.
+        # get_envgene_config_yaml returns an empty map on FileNotFoundError →
+        # sbom_retention section absent → disabled branch fires, no files deleted.
+        case_dir, sboms_dir = self._prepare("no-config-file")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+        TestHelpers.create_file(app_dir / "app-a-1.0.sbom.json", size=100)
+
+        with caplog.at_level(logging.INFO, logger="envgene"):
+            sboms_retention_policy()
+
+        assert "disabled" in caplog.text.lower(), \
+            f"expected 'disabled' log; got:\n{caplog.text}"
+        assert len(_files(app_dir)) == 1, \
+            f"files must be untouched when config is absent;\n{_dump_dir(app_dir)}"
+
+    def test_no_sbom_retention_section_disables_policy(self, caplog):
+        # config.yml exists but has no sbom_retention key (common in older deployments).
+        case_dir, sboms_dir = self._prepare("no-sbom-retention-section")
+        _write(case_dir / "configuration" / "config.yml", "some_other_key: value\n")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+        TestHelpers.create_file(app_dir / "app-a-1.0.sbom.json", size=100)
+
+        with caplog.at_level(logging.INFO, logger="envgene"):
+            sboms_retention_policy()
+
+        assert "disabled" in caplog.text.lower(), \
+            f"expected 'disabled' log; got:\n{caplog.text}"
+        assert len(_files(app_dir)) == 1, \
+            f"files must be untouched when section is absent;\n{_dump_dir(app_dir)}"
+
+    def test_enabled_without_keep_versions_skips_per_app_pruning(self, caplog):
+        # keep_versions_per_app is optional (defaults to None in SbomRetentionConfig).
+        # Per-app version pruning must be skipped; size check still runs but won't
+        # trigger here (total size is tiny, well below the limit).
+        case_dir, sboms_dir = self._prepare("enabled-no-keep-versions")
+        _write(case_dir / "configuration" / "config.yml",
+               "sbom_retention:\n  enabled: true\n")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+        for i in range(5):
+            TestHelpers.create_file(app_dir / f"app-a-{i}.sbom.json", size=100)
+
+        with caplog.at_level(logging.INFO, logger="envgene"):
+            sboms_retention_policy()
+
+        assert len(_files(app_dir)) == 5, \
+            f"all files must survive when keep_versions_per_app is absent;\n{_dump_dir(app_dir)}"
+
+    def test_keep_versions_zero_deletes_all_files(self):
+        # keep_versions_per_app: 0 is a valid boundary value.
+        # cleanup_dir_by_age(dir, 0) keeps files[0:0] → empty → all deleted.
+        case_dir, sboms_dir = self._prepare("keep-versions-zero")
+        _write(case_dir / "configuration" / "config.yml",
+               "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 0\n")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+        for i in range(3):
+            TestHelpers.create_file(app_dir / f"app-a-{i}.sbom.json", size=100)
+
+        sboms_retention_policy()
+
+        assert _files(app_dir) == [], \
+            f"keep_versions_per_app: 0 must delete all files;\n{_dump_dir(app_dir)}"
