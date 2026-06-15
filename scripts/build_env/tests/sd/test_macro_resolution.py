@@ -35,30 +35,11 @@ class TestMacroSimpleTypeResolution(BaseTest):
     their string representations ("8080", "True", "False").
     """
 
-    def test_integer_context_value_becomes_string(self):
-        # UC-CC-MR-1: api_port: {{ server_port }} with int context → "8080" (string).
-        # YAML quotes the template value, so the rendered result is always a string scalar.
-        result = _render({"api_port": "{{ server_port }}"}, server_port=8080)
-        assert result["api_port"] == "8080"
-        assert isinstance(result["api_port"], str)
-
-    def test_boolean_true_context_value_becomes_string(self):
-        # UC-CC-MR-1: use_ssl: {{ ssl_enabled }} with bool True → "True" (string).
-        result = _render({"use_ssl": "{{ ssl_enabled }}"}, ssl_enabled=True)
-        assert result["use_ssl"] == "True"
-        assert isinstance(result["use_ssl"], str)
-
     def test_boolean_false_context_value_becomes_string(self):
+        # UC-CC-MR-1: bool False → "False" (string). Not covered by the four-types test below.
         result = _render({"debug": "{{ debug_flag }}"}, debug_flag=False)
         assert result["debug"] == "False"
         assert isinstance(result["debug"], str)
-
-    def test_string_true_stays_string(self):
-        # UC-CC-MR-1: log_level: {{ debug_mode }} where debug_mode = "true" (string).
-        # Single-quoted YAML scalar prevents YAML bool coercion.
-        result = _render({"log_level": "{{ debug_mode }}"}, debug_mode="true")
-        assert result["log_level"] == "true"
-        assert isinstance(result["log_level"], str)
 
     def test_all_four_types_resolved_in_one_template(self):
         # UC-CC-MR-1 full scenario — all parameter kinds together.
@@ -181,9 +162,14 @@ class TestMacroComplexStructureResolution(BaseTest):
     # ------------------------------------------------------------------
 
     def test_missing_complex_reference_does_not_raise(self):
-        # ChainableUndefined: missing variable in complex template context must not raise.
-        result = _render({"cfg": "{{ missing_config }}"})
+        # ChainableUndefined: missing variable in a template with a nested structure
+        # must not raise and leaves other resolved keys intact.
+        result = _render(
+            {"cfg": "{{ missing_config }}", "host": "{{ db_host }}"},
+            db_host="db.example.com",
+        )
         assert result.get("cfg") in (None, "", "None", {})
+        assert result["host"] == "db.example.com"
 
 
 # ---------------------------------------------------------------------------
