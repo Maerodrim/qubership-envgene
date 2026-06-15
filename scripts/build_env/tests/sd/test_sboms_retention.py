@@ -20,6 +20,18 @@ def _files_by_mtime(app_dir: Path) -> list[str]:
     return [f.name for f in files]
 
 
+def _dump_dir(directory: Path) -> str:
+    """Return a formatted directory listing with mtime for each file, for assertion messages."""
+    if not directory.exists():
+        return f"{directory} — does not exist"
+    entries = sorted(directory.iterdir(), key=lambda f: f.stat().st_mtime)
+    if not entries:
+        return f"{directory} — empty"
+    lines = [f"  {e.name} (mtime={e.stat().st_mtime:.3f}, {'dir' if e.is_dir() else f'{e.stat().st_size}B'})"
+             for e in entries]
+    return f"{directory}:\n" + "\n".join(lines)
+
+
 def create_test_data(base_dir: Path, test_case_name: str):
     sboms_dir = base_dir / "sboms"
     config_dir = base_dir / "configuration"
@@ -120,32 +132,33 @@ def assert_results(base_dir: Path, test_case_name: str):
     elif test_case_name == "UC-SBOM-3":
         # app-a: 15→10, app-b: 12→10, app-c: 8 (untouched)
         app_a_files = _files_by_mtime(sboms_dir / "app-a")
-        assert len(app_a_files) == 10
-        assert app_a_files[-1] == "app-a-14.sbom.json", "newest file must be retained"
-        assert app_a_files[0] == "app-a-5.sbom.json", "oldest retained must be app-a-5"
+        assert len(app_a_files) == 10, _dump_dir(sboms_dir / "app-a")
+        assert app_a_files[-1] == "app-a-14.sbom.json", f"newest must be retained; got {app_a_files}"
+        assert app_a_files[0] == "app-a-5.sbom.json", f"oldest retained must be app-a-5; got {app_a_files}"
 
         app_b_files = _files_by_mtime(sboms_dir / "app-b")
-        assert len(app_b_files) == 10
-        assert app_b_files[-1] == "app-b-11.sbom.json"
-        assert app_b_files[0] == "app-b-2.sbom.json"
+        assert len(app_b_files) == 10, _dump_dir(sboms_dir / "app-b")
+        assert app_b_files[-1] == "app-b-11.sbom.json", f"newest must be retained; got {app_b_files}"
+        assert app_b_files[0] == "app-b-2.sbom.json", f"oldest retained must be app-b-2; got {app_b_files}"
 
-        assert len(_files_by_mtime(sboms_dir / "app-c")) == 8
+        app_c_files = _files_by_mtime(sboms_dir / "app-c")
+        assert len(app_c_files) == 8, _dump_dir(sboms_dir / "app-c")
 
     elif test_case_name == "UC-SBOM-4":
         postgres_files = _files_by_mtime(sboms_dir / "postgres")
-        assert len(postgres_files) == 3
-        assert postgres_files[-1] == "postgres-9.sbom.json", "newest file must be retained"
-        assert postgres_files[0] == "postgres-7.sbom.json", "oldest retained must be postgres-7"
+        assert len(postgres_files) == 3, _dump_dir(sboms_dir / "postgres")
+        assert postgres_files[-1] == "postgres-9.sbom.json", f"newest must be retained; got {postgres_files}"
+        assert postgres_files[0] == "postgres-7.sbom.json", f"oldest retained must be postgres-7; got {postgres_files}"
 
     elif test_case_name == "UC-SBOM-5":
         # Per-app retention skipped (5 < 10). Total size > limit → all app dirs trimmed to 1 newest file.
         app_a_files = _files_by_mtime(sboms_dir / "app-a")
-        assert len(app_a_files) == 1
-        assert app_a_files[0] == "app-a-4.sbom.json", "only newest app-a version must survive"
+        assert len(app_a_files) == 1, _dump_dir(sboms_dir / "app-a")
+        assert app_a_files[0] == "app-a-4.sbom.json", f"only newest app-a must survive; got {app_a_files}"
 
         app_b_files = _files_by_mtime(sboms_dir / "app-b")
-        assert len(app_b_files) == 1
-        assert app_b_files[0] == "app-b-4.sbom.json", "only newest app-b version must survive"
+        assert len(app_b_files) == 1, _dump_dir(sboms_dir / "app-b")
+        assert app_b_files[0] == "app-b-4.sbom.json", f"only newest app-b must survive; got {app_b_files}"
 
 
 class TestSbomRetention(BaseTest):
@@ -180,7 +193,7 @@ class TestSbomRetention(BaseTest):
         # UC-SBOM-NEGATIVE-1: missing sboms directory logs a warning and exits cleanly
         case_dir = self._prepare_case_dir("UC-SBOM-NEGATIVE-1")
         create_test_data(case_dir, "UC-SBOM-NEGATIVE-1")
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING, logger="envgene"):
             sboms_retention_policy()
         assert "does not exist" in caplog.text
 
@@ -190,3 +203,98 @@ class TestSbomRetention(BaseTest):
         create_test_data(case_dir, "UC-SBOM-NEGATIVE-2")
         with pytest.raises(ValidationError):
             sboms_retention_policy()
+
+
+class TestSbomMigration(BaseTest):
+    """Tests for UC-SBOM-MIG: migration from flat to per-application SBOM layout."""
+
+    def setup_method(self):
+        self.feature_dir = self.output_dir / "test_handle_sboms"
+        self.feature_dir.mkdir(parents=True, exist_ok=True)
+        self.set_ci_project_dir(self.feature_dir)
+
+    def _prepare_case_dir(self, test_case_name: str) -> Path:
+        case_dir = self.feature_dir / test_case_name
+        if case_dir.exists():
+            shutil.rmtree(case_dir)
+        case_dir.mkdir(parents=True, exist_ok=True)
+        self.set_ci_project_dir(case_dir)
+        return case_dir
+
+    def test_flat_legacy_files_are_removed_on_first_run(self, caplog):
+        # UC-SBOM-MIG-1: on first run after upgrade, flat SBOM files directly under /sboms/
+        # are deleted by the retention policy. Per-application subdirectory files are untouched.
+        # The regeneration of SBOMs in the new per-app layout is handled by the effective set
+        # generation pipeline and is outside the scope of sboms_retention_policy.
+        case_dir = self._prepare_case_dir("UC-SBOM-MIG-1")
+        sboms_dir = case_dir / "sboms"
+        sboms_dir.mkdir()
+        config_dir = case_dir / "configuration"
+        config_dir.mkdir()
+        (config_dir / "config.yml").write_text("sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
+
+        # Legacy flat layout: files directly under /sboms/
+        flat_app_a = sboms_dir / "app-a-1.0.sbom.json"
+        flat_app_b = sboms_dir / "app-b-2.3.sbom.json"
+        TestHelpers.create_file(flat_app_a, size=100)
+        TestHelpers.create_file(flat_app_b, size=100)
+
+        # New per-app layout already partially populated (e.g. from a prior partial run)
+        app_a_dir = sboms_dir / "app-a"
+        app_a_dir.mkdir()
+        existing_new_layout_file = app_a_dir / "app-a-1.0.sbom.json"
+        TestHelpers.create_file(existing_new_layout_file, size=100)
+
+        with caplog.at_level(logging.INFO, logger="envgene"):
+            sboms_retention_policy()
+
+        # Flat legacy files must be deleted
+        assert not flat_app_a.exists(), f"flat app-a SBOM must be removed;\n{_dump_dir(sboms_dir)}"
+        assert not flat_app_b.exists(), f"flat app-b SBOM must be removed;\n{_dump_dir(sboms_dir)}"
+
+        # No flat files remain directly under /sboms/
+        remaining_flat = [f for f in sboms_dir.iterdir() if f.is_file()]
+        assert remaining_flat == [], f"unexpected flat files remain:\n{_dump_dir(sboms_dir)}"
+
+        # Per-app subdirectory files must be untouched
+        assert existing_new_layout_file.exists(), \
+            f"per-app layout file must not be deleted;\n{_dump_dir(app_a_dir)}"
+
+        # Policy must log removal of legacy files
+        assert "legacy" in caplog.text.lower() or "Removing" in caplog.text, \
+            f"expected removal log entry; captured log:\n{caplog.text}"
+
+    def test_empty_sboms_dir_does_not_raise(self):
+        # Migration negative: /sboms/ exists but is completely empty — policy must exit cleanly
+        case_dir = self._prepare_case_dir("UC-SBOM-MIG-NEGATIVE-1")
+        sboms_dir = case_dir / "sboms"
+        sboms_dir.mkdir()
+        config_dir = case_dir / "configuration"
+        config_dir.mkdir()
+        (config_dir / "config.yml").write_text("sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
+
+        sboms_retention_policy()  # must not raise
+
+        assert list(sboms_dir.iterdir()) == [], \
+            f"sboms dir must remain empty;\n{_dump_dir(sboms_dir)}"
+
+    def test_already_migrated_per_app_files_untouched(self):
+        # Migration negative: /sboms/ contains only per-app subdirectories (already migrated) —
+        # no flat files to delete, per-app files must survive intact.
+        case_dir = self._prepare_case_dir("UC-SBOM-MIG-NEGATIVE-2")
+        sboms_dir = case_dir / "sboms"
+        sboms_dir.mkdir()
+        config_dir = case_dir / "configuration"
+        config_dir.mkdir()
+        (config_dir / "config.yml").write_text("sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
+
+        app_a_dir = sboms_dir / "app-a"
+        app_a_dir.mkdir()
+        for i in range(3):
+            TestHelpers.create_file(app_a_dir / f"app-a-{i}.sbom.json", size=100)
+
+        sboms_retention_policy()
+
+        remaining = list(app_a_dir.iterdir())
+        assert len(remaining) == 3, \
+            f"per-app files must not be deleted when already in new layout;\n{_dump_dir(app_a_dir)}"
