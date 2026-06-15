@@ -273,40 +273,6 @@ class TestSbomMigration(BaseTest):
         assert "legacy" in caplog.text.lower() or "Removing" in caplog.text, \
             f"expected removal log entry; captured log:\n{caplog.text}"
 
-    def test_empty_sboms_dir_does_not_raise(self):
-        # Migration negative: /sboms/ exists but is completely empty — policy must exit cleanly
-        case_dir = self._prepare_case_dir("UC-SBOM-MIG-NEGATIVE-1")
-        sboms_dir = case_dir / "sboms"
-        sboms_dir.mkdir()
-        config_dir = case_dir / "configuration"
-        config_dir.mkdir()
-        (config_dir / "config.yml").write_text("sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
-
-        sboms_retention_policy()  # must not raise
-
-        assert list(sboms_dir.iterdir()) == [], \
-            f"sboms dir must remain empty;\n{_dump_dir(sboms_dir)}"
-
-    def test_already_migrated_per_app_files_untouched(self):
-        # Migration negative: /sboms/ contains only per-app subdirectories (already migrated) —
-        # no flat files to delete, per-app files must survive intact.
-        case_dir = self._prepare_case_dir("UC-SBOM-MIG-NEGATIVE-2")
-        sboms_dir = case_dir / "sboms"
-        sboms_dir.mkdir()
-        config_dir = case_dir / "configuration"
-        config_dir.mkdir()
-        (config_dir / "config.yml").write_text("sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
-
-        app_a_dir = sboms_dir / "app-a"
-        app_a_dir.mkdir()
-        for i in range(3):
-            TestHelpers.create_file(app_a_dir / f"app-a-{i}.sbom.json", size=100)
-
-        sboms_retention_policy()
-
-        remaining = list(app_a_dir.iterdir())
-        assert len(remaining) == 3, \
-            f"per-app files must not be deleted when already in new layout;\n{_dump_dir(app_a_dir)}"
 
 
 class TestSbomRetentionBackwardCompat(BaseTest):

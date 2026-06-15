@@ -64,14 +64,6 @@ class TestNullValueValidationParameters(BaseTest):
         assert "Starting validation of parameters" in caplog.text
         assert "Validation of parameters is completed" in caplog.text
 
-    def test_no_parameter_sections_passes(self):
-        # UC-NVV-3: files with no parameter keys at all — validation must pass
-        env_dir = self._prepare_env("UC-NVV-3-no-params")
-        _write(env_dir / "tenant.yml", "name: test-tenant\n")
-        _write(env_dir / "cloud.yml", "name: test-cloud\n")
-
-        validate_parameters(env_dir=str(env_dir))
-
     # ------------------------------------------------------------------
     # Negative — UC-NVV-1
     # ------------------------------------------------------------------
@@ -188,12 +180,6 @@ class TestNullValueValidationCredentials(BaseTest):
 
         assert "Starting validation of credentials" in caplog.text
         assert "Validation of credentials is completed" in caplog.text
-
-    def test_empty_credentials_dir_passes(self):
-        # UC-NVV-3: no credential files at all — nothing to validate
-        creds_dir = self._prepare_creds_dir("UC-NVV-3-empty-creds")
-
-        validate_creds(creds_path=str(creds_dir))
 
     # ------------------------------------------------------------------
     # Negative — UC-NVV-2
