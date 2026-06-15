@@ -303,3 +303,114 @@ class TestNullValueValidationCredentials(BaseTest):
         error = str(exc_info.value)
         assert "credId: bad-cred - secret is not set" in error
         assert "good-cred" not in error
+
+
+class TestNullValueEdgeCases(BaseTest):
+    """Edge cases for is_envgenenullvalue boundary conditions and structural anomalies."""
+
+    def setup_method(self):
+        self.feature_dir = self.output_dir / FEATURE_TEST_DIR
+        self.feature_dir.mkdir(parents=True, exist_ok=True)
+
+    def _prepare_env(self, test_name: str) -> Path:
+        env_dir = self.feature_dir / test_name
+        if env_dir.exists():
+            shutil.rmtree(env_dir)
+        env_dir.mkdir(parents=True)
+        return env_dir
+
+    def _prepare_creds_dir(self, test_name: str) -> Path:
+        creds_dir = self.feature_dir / test_name / "Credentials"
+        if creds_dir.exists():
+            shutil.rmtree(creds_dir)
+        creds_dir.mkdir(parents=True)
+        return creds_dir
+
+    # ------------------------------------------------------------------
+    # is_envgenenullvalue — substring / empty string / whitespace
+    # ------------------------------------------------------------------
+
+    def test_null_value_as_substring_in_parameter_does_not_raise(self):
+        # is_envgenenullvalue checks exact equality, not substring.
+        # "prefix-envgeneNullValue" must NOT be treated as unset.
+        env_dir = self._prepare_env("edge-null-substring-param")
+        _write(env_dir / "tenant.yml",
+               f"name: my-tenant\ndeployParameters:\n  KEY: prefix-{ENVGENE_NULL}\n")
+        _write(env_dir / "cloud.yml", "name: my-cloud\n")
+
+        validate_parameters(env_dir=str(env_dir))
+
+    def test_null_value_as_substring_in_credential_does_not_raise(self):
+        # Same substring check for credentials.
+        creds_dir = self._prepare_creds_dir("edge-null-substring-cred")
+        _write(creds_dir / "credentials.yml",
+               f"db-cred:\n  type: secret\n  data:\n    secret: prefix-{ENVGENE_NULL}\n")
+
+        validate_creds(creds_path=str(creds_dir))
+
+    def test_empty_string_parameter_does_not_raise(self):
+        # Empty string is not envgeneNullValue — must pass validation.
+        env_dir = self._prepare_env("edge-empty-string-param")
+        _write(env_dir / "tenant.yml",
+               "name: my-tenant\ndeployParameters:\n  KEY: ''\n")
+        _write(env_dir / "cloud.yml", "name: my-cloud\n")
+
+        validate_parameters(env_dir=str(env_dir))
+
+    def test_empty_string_credential_does_not_raise(self):
+        # Empty string password is not envgeneNullValue — structural check only.
+        creds_dir = self._prepare_creds_dir("edge-empty-string-cred")
+        _write(creds_dir / "credentials.yml",
+               "db-cred:\n  type: usernamePassword\n  data:\n    username: admin\n    password: ''\n")
+
+        validate_creds(creds_path=str(creds_dir))
+
+    # ------------------------------------------------------------------
+    # Empty credentials file
+    # ------------------------------------------------------------------
+
+    def test_empty_credentials_file_does_not_raise(self):
+        # credentials.yml exists but contains only whitespace / is empty —
+        # openYaml returns get_empty_yaml() (CommentedMap), iteration over .items() yields nothing.
+        creds_dir = self._prepare_creds_dir("edge-empty-creds-file")
+        (creds_dir / "credentials.yml").write_text("")
+
+        validate_creds(creds_path=str(creds_dir))
+
+    # ------------------------------------------------------------------
+    # Missing tenant.yml / cloud.yml — structural FileNotFoundError
+    # ------------------------------------------------------------------
+
+    def test_missing_tenant_yml_raises(self):
+        # openYaml without allow_default raises FileNotFoundError when tenant.yml is absent.
+        # This is expected — validate_parameters does not silently skip missing files.
+        env_dir = self._prepare_env("edge-missing-tenant")
+        _write(env_dir / "cloud.yml", "name: my-cloud\n")
+        # tenant.yml intentionally absent
+
+        with pytest.raises(FileNotFoundError):
+            validate_parameters(env_dir=str(env_dir))
+
+    def test_missing_cloud_yml_raises(self):
+        # Same for cloud.yml.
+        env_dir = self._prepare_env("edge-missing-cloud")
+        _write(env_dir / "tenant.yml", "name: my-tenant\n")
+        # cloud.yml intentionally absent
+
+        with pytest.raises(FileNotFoundError):
+            validate_parameters(env_dir=str(env_dir))
+
+    # ------------------------------------------------------------------
+    # Missing `data` key in credential — structural KeyError (bug documentation)
+    # ------------------------------------------------------------------
+
+    def test_credential_missing_data_key_raises_key_error(self):
+        # check_cred_value does credValue["data"] without guard — if `data` key is absent,
+        # a KeyError is raised instead of ValidationError. This test documents current behavior.
+        # If this is fixed in the future to raise ValidationError, update accordingly.
+        creds_dir = self._prepare_creds_dir("edge-missing-data-key")
+        _write(creds_dir / "credentials.yml",
+               "broken-cred:\n  type: secret\n")  # no `data` key at all
+
+        with pytest.raises(KeyError):
+            validate_creds(creds_path=str(creds_dir))

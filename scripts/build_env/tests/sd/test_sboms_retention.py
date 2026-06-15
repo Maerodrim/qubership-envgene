@@ -391,3 +391,75 @@ class TestSbomRetentionBackwardCompat(BaseTest):
 
         with pytest.raises(ValidationError):
             sboms_retention_policy()
+
+
+class TestSbomRetentionEdgeCases(BaseTest):
+    """Edge cases and boundary conditions for sboms_retention_policy."""
+
+    def setup_method(self):
+        self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "edge_cases"
+        self.feature_dir.mkdir(parents=True, exist_ok=True)
+        self.set_ci_project_dir(self.feature_dir)
+
+    def _prepare(self, name: str) -> tuple[Path, Path]:
+        case_dir = self.feature_dir / name
+        if case_dir.exists():
+            shutil.rmtree(case_dir)
+        case_dir.mkdir(parents=True)
+        self.set_ci_project_dir(case_dir)
+        sboms_dir = case_dir / "sboms"
+        sboms_dir.mkdir()
+        return case_dir, sboms_dir
+
+    def test_size_exactly_at_limit_does_not_trigger_size_cleanup(self, caplog):
+        # is_over_size_limit uses strict `>`, not `>=`.
+        # A directory whose total size equals the limit exactly must NOT trigger size cleanup.
+        from envgenehelper.constants import CI_JOB_ARTIFACT_MAX_SIZE_MB
+        case_dir, sboms_dir = self._prepare("size-at-limit")
+        _write(case_dir / "configuration" / "config.yml",
+               "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+        exact_bytes = CI_JOB_ARTIFACT_MAX_SIZE_MB * 1024 * 1024
+        TestHelpers.create_file(app_dir / "app-a-1.0.sbom.json", size=exact_bytes)
+
+        with caplog.at_level(logging.INFO, logger="envgene"):
+            sboms_retention_policy()
+
+        assert len(_files(app_dir)) == 1, \
+            f"file at exact size limit must not be deleted;\n{_dump_dir(app_dir)}"
+        assert "exceeds size limit" not in caplog.text, \
+            "size limit cleanup must not run when size == limit"
+
+    def test_empty_app_subdir_does_not_raise(self):
+        # cleanup_dir_by_age on an empty directory must exit cleanly without error.
+        case_dir, sboms_dir = self._prepare("empty-app-dir")
+        _write(case_dir / "configuration" / "config.yml",
+               "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 3\n")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+
+        sboms_retention_policy()  # must not raise
+
+        assert _files(app_dir) == [], \
+            f"empty app dir must remain empty;\n{_dump_dir(app_dir)}"
+
+    def test_app_subdir_with_only_subdirectories_not_deleted(self):
+        # cleanup_dir_by_age filters with is_file() — nested subdirectories must survive
+        # regardless of keep_versions_per_app.
+        case_dir, sboms_dir = self._prepare("app-dir-with-subdirs")
+        _write(case_dir / "configuration" / "config.yml",
+               "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 1\n")
+        app_dir = sboms_dir / "app-a"
+        app_dir.mkdir()
+        nested = app_dir / "nested-dir"
+        nested.mkdir()
+        TestHelpers.create_file(app_dir / "app-a-1.0.sbom.json", size=100, mtime=time.time())
+        TestHelpers.create_file(app_dir / "app-a-2.0.sbom.json", size=100, mtime=time.time() + 1)
+
+        sboms_retention_policy()
+
+        assert nested.exists(), \
+            f"nested subdirectory must not be deleted by cleanup;\n{_dump_dir(app_dir)}"
+        assert len(_files(app_dir)) == 1, \
+            f"only 1 file must remain per keep_versions_per_app=1;\n{_dump_dir(app_dir)}"
