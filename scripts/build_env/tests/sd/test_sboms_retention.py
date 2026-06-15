@@ -13,6 +13,11 @@ from scripts.build_env.tests.base_test import BaseTest
 FEATURE_TEST_DIR = "test_handle_sboms"
 
 
+def _write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
 def _files(directory: Path) -> list[str]:
     return [f.name for f in directory.iterdir() if f.is_file()]
 
@@ -39,17 +44,13 @@ class TestSbomRetention(BaseTest):
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR
         self.feature_dir.mkdir(parents=True, exist_ok=True)
-        self.config_data = self.test_data_dir / FEATURE_TEST_DIR
 
-    def _prepare(self, tc_name: str) -> Path:
-        """
-        Copy the static config from test_data into a fresh case directory
-        and return that directory as CI_PROJECT_DIR.
-        """
+    def _prepare(self, tc_name: str, config_content: str) -> Path:
         case_dir = self.feature_dir / tc_name
         if case_dir.exists():
             shutil.rmtree(case_dir)
-        shutil.copytree(self.config_data / tc_name, case_dir)
+        case_dir.mkdir(parents=True)
+        _write(case_dir / "configuration" / "config.yml", config_content)
         self.set_ci_project_dir(case_dir)
         return case_dir
 
@@ -58,7 +59,7 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_1_retention_disabled_files_untouched(self):
-        case_dir = self._prepare("TC-SBOM-1")
+        case_dir = self._prepare("TC-SBOM-1", "sbom_retention:\n  enabled: false\n")
         app_a_dir = case_dir / "sboms" / "app-a"
         app_a_dir.mkdir(parents=True)
         TestHelpers.create_file(app_a_dir / "app-a-1.0.sbom.json", size=100)
@@ -73,7 +74,8 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_2_all_apps_below_limit_nothing_pruned(self):
-        case_dir = self._prepare("TC-SBOM-2")
+        case_dir = self._prepare("TC-SBOM-2",
+                                 "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
         now = time.time()
         sboms_dir = case_dir / "sboms"
         app_a_dir = sboms_dir / "app-a"
@@ -100,7 +102,8 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_3_excess_files_pruned_to_limit(self):
-        case_dir = self._prepare("TC-SBOM-3")
+        case_dir = self._prepare("TC-SBOM-3",
+                                 "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
         now = time.time()
         sboms_dir = case_dir / "sboms"
         app_a_dir = sboms_dir / "app-a"
@@ -136,7 +139,8 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_4_strict_limit_keeps_3_newest(self):
-        case_dir = self._prepare("TC-SBOM-4")
+        case_dir = self._prepare("TC-SBOM-4",
+                                 "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 3\n")
         now = time.time()
         postgres_dir = case_dir / "sboms" / "postgres"
         postgres_dir.mkdir(parents=True)
@@ -155,7 +159,8 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_5_size_limit_trims_all_apps_to_one(self):
-        case_dir = self._prepare("TC-SBOM-5")
+        case_dir = self._prepare("TC-SBOM-5",
+                                 "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
         now = time.time()
         sboms_dir = case_dir / "sboms"
         app_a_dir = sboms_dir / "app-a"
@@ -188,7 +193,6 @@ class TestSbomRetention(BaseTest):
             shutil.rmtree(case_dir)
         case_dir.mkdir(parents=True)
         self.set_ci_project_dir(case_dir)
-        # No sboms/ directory, no config — sboms_retention_policy must not raise.
 
         with caplog.at_level(logging.WARNING, logger="envgene"):
             sboms_retention_policy()
@@ -197,7 +201,8 @@ class TestSbomRetention(BaseTest):
 
     def test_invalid_config_raises_validation_error(self):
         # UC-SBOM-NEGATIVE-2: invalid keep_versions_per_app type must raise ValidationError.
-        case_dir = self._prepare("UC-SBOM-NEGATIVE-2")
+        case_dir = self._prepare("UC-SBOM-NEGATIVE-2",
+                                 "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 'invalid'\n")
         (case_dir / "sboms").mkdir(parents=True)
 
         with pytest.raises(ValidationError):
@@ -210,13 +215,14 @@ class TestSbomMigration(BaseTest):
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "migration"
         self.feature_dir.mkdir(parents=True, exist_ok=True)
-        self.config_data = self.test_data_dir / FEATURE_TEST_DIR / "migration"
 
     def _prepare(self, tc_name: str) -> Path:
         case_dir = self.feature_dir / tc_name
         if case_dir.exists():
             shutil.rmtree(case_dir)
-        shutil.copytree(self.config_data / tc_name, case_dir)
+        case_dir.mkdir(parents=True)
+        _write(case_dir / "configuration" / "config.yml",
+               "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
         self.set_ci_project_dir(case_dir)
         return case_dir
 
@@ -256,13 +262,13 @@ class TestSbomRetentionBackwardCompat(BaseTest):
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "backward_compat"
         self.feature_dir.mkdir(parents=True, exist_ok=True)
-        self.config_data = self.test_data_dir / FEATURE_TEST_DIR / "backward-compat"
 
-    def _prepare(self, case_name: str) -> tuple[Path, Path]:
+    def _prepare(self, case_name: str, config_content: str) -> tuple[Path, Path]:
         case_dir = self.feature_dir / case_name
         if case_dir.exists():
             shutil.rmtree(case_dir)
-        shutil.copytree(self.config_data / case_name, case_dir)
+        case_dir.mkdir(parents=True)
+        _write(case_dir / "configuration" / "config.yml", config_content)
         self.set_ci_project_dir(case_dir)
         sboms_dir = case_dir / "sboms"
         sboms_dir.mkdir()
@@ -291,7 +297,8 @@ class TestSbomRetentionBackwardCompat(BaseTest):
 
     def test_no_sbom_retention_section_disables_policy(self, caplog):
         # config.yml exists but has no sbom_retention key — policy must disable.
-        case_dir, sboms_dir = self._prepare("no-sbom-retention-section")
+        case_dir, sboms_dir = self._prepare("no-sbom-retention-section",
+                                            "some_other_key: value\n")
         app_dir = sboms_dir / "app-a"
         app_dir.mkdir()
         TestHelpers.create_file(app_dir / "app-a-1.0.sbom.json", size=100)
@@ -306,7 +313,8 @@ class TestSbomRetentionBackwardCompat(BaseTest):
 
     def test_enabled_without_keep_versions_skips_per_app_pruning(self, caplog):
         # keep_versions_per_app is optional — per-app pruning must be skipped.
-        case_dir, sboms_dir = self._prepare("enabled-no-keep-versions")
+        case_dir, sboms_dir = self._prepare("enabled-no-keep-versions",
+                                            "sbom_retention:\n  enabled: true\n")
         app_dir = sboms_dir / "app-a"
         app_dir.mkdir()
         for i in range(5):
@@ -320,7 +328,8 @@ class TestSbomRetentionBackwardCompat(BaseTest):
 
     def test_keep_versions_zero_raises_validation_error(self):
         # keep_versions_per_app: 0 is invalid (gt=0 constraint) — must raise ValidationError.
-        case_dir, sboms_dir = self._prepare("keep-versions-zero")
+        case_dir, sboms_dir = self._prepare("keep-versions-zero",
+                                            "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 0\n")
         app_dir = sboms_dir / "app-a"
         app_dir.mkdir()
         for i in range(3):
@@ -336,13 +345,13 @@ class TestSbomRetentionEdgeCases(BaseTest):
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "edge_cases"
         self.feature_dir.mkdir(parents=True, exist_ok=True)
-        self.config_data = self.test_data_dir / FEATURE_TEST_DIR / "edge"
 
-    def _prepare(self, case_name: str) -> tuple[Path, Path]:
+    def _prepare(self, case_name: str, config_content: str) -> tuple[Path, Path]:
         case_dir = self.feature_dir / case_name
         if case_dir.exists():
             shutil.rmtree(case_dir)
-        shutil.copytree(self.config_data / case_name, case_dir)
+        case_dir.mkdir(parents=True)
+        _write(case_dir / "configuration" / "config.yml", config_content)
         self.set_ci_project_dir(case_dir)
         sboms_dir = case_dir / "sboms"
         sboms_dir.mkdir()
@@ -351,7 +360,9 @@ class TestSbomRetentionEdgeCases(BaseTest):
     def test_size_exactly_at_limit_does_not_trigger_size_cleanup(self, caplog):
         # is_over_size_limit uses strict `>` — exactly at limit must NOT trigger cleanup.
         from envgenehelper.constants import CI_JOB_ARTIFACT_MAX_SIZE_MB
-        case_dir, sboms_dir = self._prepare("size-at-limit")
+        case_dir, sboms_dir = self._prepare(
+            "size-at-limit",
+            "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 10\n")
         app_dir = sboms_dir / "app-a"
         app_dir.mkdir()
         exact_bytes = CI_JOB_ARTIFACT_MAX_SIZE_MB * 1024 * 1024
@@ -367,7 +378,9 @@ class TestSbomRetentionEdgeCases(BaseTest):
 
     def test_empty_app_subdir_does_not_raise(self):
         # cleanup_dir_by_age on an empty directory must exit cleanly.
-        case_dir, sboms_dir = self._prepare("empty-app-dir")
+        case_dir, sboms_dir = self._prepare(
+            "empty-app-dir",
+            "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 3\n")
         app_dir = sboms_dir / "app-a"
         app_dir.mkdir()
 
@@ -378,7 +391,9 @@ class TestSbomRetentionEdgeCases(BaseTest):
 
     def test_app_subdir_with_only_subdirectories_not_deleted(self):
         # cleanup_dir_by_age filters with is_file() — nested subdirs must survive.
-        case_dir, sboms_dir = self._prepare("app-dir-with-subdirs")
+        case_dir, sboms_dir = self._prepare(
+            "app-dir-with-subdirs",
+            "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 1\n")
         app_dir = sboms_dir / "app-a"
         app_dir.mkdir()
         nested = app_dir / "nested-dir"
