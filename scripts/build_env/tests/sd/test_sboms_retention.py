@@ -378,9 +378,9 @@ class TestSbomRetentionBackwardCompat(BaseTest):
         assert len(_files(app_dir)) == 5, \
             f"all files must survive when keep_versions_per_app is absent;\n{_dump_dir(app_dir)}"
 
-    def test_keep_versions_zero_deletes_all_files(self):
-        # keep_versions_per_app: 0 is a valid boundary value.
-        # cleanup_dir_by_age(dir, 0) keeps files[0:0] → empty → all deleted.
+    def test_keep_versions_zero_raises_validation_error(self):
+        # keep_versions_per_app: 0 is invalid — gt=0 constraint in SbomRetentionConfig.
+        # Zero would silently wipe all SBOM files, so it is explicitly disallowed.
         case_dir, sboms_dir = self._prepare("keep-versions-zero")
         _write(case_dir / "configuration" / "config.yml",
                "sbom_retention:\n  enabled: true\n  keep_versions_per_app: 0\n")
@@ -389,7 +389,5 @@ class TestSbomRetentionBackwardCompat(BaseTest):
         for i in range(3):
             TestHelpers.create_file(app_dir / f"app-a-{i}.sbom.json", size=100)
 
-        sboms_retention_policy()
-
-        assert _files(app_dir) == [], \
-            f"keep_versions_per_app: 0 must delete all files;\n{_dump_dir(app_dir)}"
+        with pytest.raises(ValidationError):
+            sboms_retention_policy()
