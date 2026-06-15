@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -5,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from envgenehelper import openYaml
 from envgenehelper.env_helper import Environment
 from envgenehelper.test_helpers import TestHelpers
 from scripts.build_env.tests.base_test import BaseTest
@@ -28,54 +28,40 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content)
 
 
-def _copy_namespaces(src_namespaces_dir: Path, env: Environment) -> None:
-    """Copy namespace folder fixtures into the environment's Namespaces directory."""
-    target_ns_dir = Path(env.env_path) / "Namespaces"
-    if target_ns_dir.exists():
-        shutil.rmtree(target_ns_dir)
-    shutil.copytree(src_namespaces_dir, target_ns_dir)
+def _write_namespace(env: Environment, folder_name: str, logical_name: str) -> None:
+    ns_path = Path(env.env_path) / "Namespaces" / folder_name / "namespace.yml"
+    _write(ns_path, f"name: {logical_name}\n")
 
 
-def _load_tc(test_data_dir: Path, tc_name: str) -> tuple:
-    file_path = test_data_dir / tc_name / f"{tc_name}.yaml"
-    data = openYaml(file_path)
-    return (
-        data.get("SD_DATA", "{}"),
-        data.get("SD_SOURCE_TYPE", ""),
-        data.get("SD_VERSION", ""),
-        data.get("SD_DELTA", ""),
-        data.get("SD_REPO_MERGE_MODE", "basic-merge"),
-    )
+def _sd_json(applications: list, user_data: dict | None = None) -> str:
+    sd = {"version": 1, "type": "solutionDeploy", "applications": applications}
+    if user_data is not None:
+        sd["userData"] = user_data
+    return json.dumps([sd])
+
+
+def _read_sd(env: Environment) -> dict:
+    from envgenehelper import openYaml
+    sd_path = Path(env.env_path) / "Inventory" / "solution-descriptor" / "sd.yaml"
+    return openYaml(sd_path)
 
 
 class TestHandleDeployPostfixPositive(BaseTest):
     """
-    UC-CC-DP-1..3 positive paths exercised through handle_sd():
-    namespace.yml fixtures are placed on disk before each test, handle_sd() processes
-    them, and the resulting sd.yaml is compared against the ER directory.
+    UC-CC-DP-1..2 positive paths exercised through handle_sd().
+    Namespace fixtures and SD data are created programmatically — no filesystem fixtures required.
     """
 
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR
-        self.test_data_dir = self.test_data_dir / FEATURE_TEST_DIR
-        self.ns_prerequisites = self.test_data_dir / "prerequisites" / "namespaces"
-
         TestHelpers.clean_test_dir(self.feature_dir)
         os.environ["CLUSTER_NAME"] = CLUSTER
         os.environ["ENVIRONMENT_NAME"] = ENV_NAME
         os.environ["FULL_ENV_NAME"] = FULL_ENV_NAME
         self.set_ci_project_dir(self.feature_dir)
 
-    def _prepare(self, ns_preset: str) -> Environment:
-        """Create a fresh environment directory with the requested namespace fixtures."""
-        env = Environment(str(self.feature_dir), CLUSTER, ENV_NAME)
-        _copy_namespaces(self.ns_prerequisites / ns_preset, env)
-        return env
-
-    def _assert_sd(self, env: Environment, tc_name: str) -> None:
-        sd_dir = Path(env.env_path) / "Inventory" / "solution-descriptor"
-        er_dir = self.test_data_dir / "ER" / tc_name
-        TestHelpers.assert_dirs_content(er_dir, sd_dir, check_for_missing_files=True, check_for_extra_files=True)
+    def _prepare(self) -> Environment:
+        return Environment(str(self.feature_dir), CLUSTER, ENV_NAME)
 
     # ------------------------------------------------------------------
     # TC-DP-001: UC-CC-DP-1 — exact match: logical name → folder name
@@ -84,12 +70,21 @@ class TestHandleDeployPostfixPositive(BaseTest):
     def test_tc_dp_001_exact_match_postfix_replaced(self):
         # UC-CC-DP-1: deployPostfix "core-namespace" == namespace logical name → replaced
         # with folder name "core". userData removed because only useDeployPostfixAsNamespace present.
-        env = self._prepare("single-core")
-        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-001")
+        env = self._prepare()
+        _write_namespace(env, "core", "core-namespace")
+        sd_data = _sd_json(
+            applications=[{"version": "core-app:1.0", "deployPostfix": "core-namespace"}],
+            user_data={"useDeployPostfixAsNamespace": True},
+        )
 
-        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
+        handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
-        self._assert_sd(env, "TC-DP-001")
+        result = _read_sd(env)
+        apps = result["applications"]
+        assert len(apps) == 1
+        assert apps[0]["version"] == "core-app:1.0"
+        assert apps[0]["deployPostfix"] == "core"
+        assert "userData" not in result
 
     # ------------------------------------------------------------------
     # TC-DP-002: UC-CC-DP-2 — BG Domain: origin and peer namespaces both replaced
@@ -97,13 +92,28 @@ class TestHandleDeployPostfixPositive(BaseTest):
 
     def test_tc_dp_002_bg_domain_origin_and_peer_replaced(self):
         # UC-CC-DP-2: SD has two apps — one for origin, one for peer. Both deployPostfixes
-        # already match their logical names (folder == logical name for BG domain namespaces).
-        env = self._prepare("bg-domain")
-        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-002")
+        # match their logical names (folder name == logical name for BG domain namespaces).
+        env = self._prepare()
+        _write_namespace(env, "bss-origin", "bss-origin")
+        _write_namespace(env, "bss-peer", "bss-peer")
+        sd_data = _sd_json(
+            applications=[
+                {"version": "origin-app:1.0", "deployPostfix": "bss-origin"},
+                {"version": "peer-app:1.0", "deployPostfix": "bss-peer"},
+            ],
+            user_data={"useDeployPostfixAsNamespace": True},
+        )
 
-        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
+        handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
-        self._assert_sd(env, "TC-DP-002")
+        result = _read_sd(env)
+        apps = result["applications"]
+        assert len(apps) == 2
+        versions = {a["version"] for a in apps}
+        postfixes = {a["deployPostfix"] for a in apps}
+        assert versions == {"origin-app:1.0", "peer-app:1.0"}
+        assert postfixes == {"bss-origin", "bss-peer"}
+        assert "userData" not in result
 
     # ------------------------------------------------------------------
     # TC-DP-003: UC-CC-DP-1 — multiple namespaces, all replaced
@@ -111,12 +121,26 @@ class TestHandleDeployPostfixPositive(BaseTest):
 
     def test_tc_dp_003_multiple_namespaces_all_replaced(self):
         # UC-CC-DP-1: two apps with distinct deployPostfixes — each maps to its folder name.
-        env = self._prepare("multi-ns")
-        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-003")
+        env = self._prepare()
+        _write_namespace(env, "core", "core-namespace")
+        _write_namespace(env, "bss", "bss-namespace")
+        sd_data = _sd_json(
+            applications=[
+                {"version": "core-app:1.0", "deployPostfix": "core-namespace"},
+                {"version": "bss-app:1.0", "deployPostfix": "bss-namespace"},
+            ],
+            user_data={"useDeployPostfixAsNamespace": True},
+        )
 
-        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
+        handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
-        self._assert_sd(env, "TC-DP-003")
+        result = _read_sd(env)
+        apps = result["applications"]
+        assert len(apps) == 2
+        postfix_map = {a["version"]: a["deployPostfix"] for a in apps}
+        assert postfix_map["core-app:1.0"] == "core"
+        assert postfix_map["bss-app:1.0"] == "bss"
+        assert "userData" not in result
 
     # ------------------------------------------------------------------
     # TC-DP-004: flag absent — SD passes through unchanged
@@ -125,12 +149,19 @@ class TestHandleDeployPostfixPositive(BaseTest):
     def test_tc_dp_004_no_flag_sd_unchanged(self):
         # Backward compat: without useDeployPostfixAsNamespace the deployPostfix values
         # must reach the output sd.yaml exactly as provided.
-        env = self._prepare("single-core")
-        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-004")
+        env = self._prepare()
+        _write_namespace(env, "core", "core-namespace")
+        sd_data = _sd_json(
+            applications=[{"version": "core-app:1.0", "deployPostfix": "core-namespace"}],
+        )
 
-        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
+        handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
-        self._assert_sd(env, "TC-DP-004")
+        result = _read_sd(env)
+        apps = result["applications"]
+        assert len(apps) == 1
+        assert apps[0]["version"] == "core-app:1.0"
+        assert apps[0]["deployPostfix"] == "core-namespace"
 
 
 class TestHandleDeployPostfixNegative(BaseTest):
@@ -141,22 +172,16 @@ class TestHandleDeployPostfixNegative(BaseTest):
 
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "negative"
-        self.test_data_dir_base = self.test_data_dir / FEATURE_TEST_DIR
-        self.ns_prerequisites = self.test_data_dir_base / "prerequisites" / "namespaces"
-
         TestHelpers.clean_test_dir(self.feature_dir)
         os.environ["CLUSTER_NAME"] = CLUSTER
         os.environ["ENVIRONMENT_NAME"] = ENV_NAME
         os.environ["FULL_ENV_NAME"] = FULL_ENV_NAME
         self.set_ci_project_dir(self.feature_dir)
 
-    def _prepare(self, ns_preset: str) -> Environment:
-        env = Environment(str(self.feature_dir), CLUSTER, ENV_NAME)
-        _copy_namespaces(self.ns_prerequisites / ns_preset, env)
-        return env
+    def _prepare(self) -> Environment:
+        return Environment(str(self.feature_dir), CLUSTER, ENV_NAME)
 
     def _sd_data_with_postfix(self, postfix: str) -> str:
-        import json
         return json.dumps([{
             "version": 1,
             "type": "solutionDeploy",
@@ -171,7 +196,8 @@ class TestHandleDeployPostfixNegative(BaseTest):
     def test_unknown_postfix_exits_with_code_1(self, caplog):
         # UC-CC-DP-3: deployPostfix "unknown-namespace" does not match any namespace
         # logical name → handle_sd must call exit(1).
-        env = self._prepare("single-core")
+        env = self._prepare()
+        _write_namespace(env, "core", "core-namespace")
         sd_data = self._sd_data_with_postfix("unknown-namespace")
 
         with caplog.at_level(logging.ERROR, logger="envgene"):
@@ -184,7 +210,8 @@ class TestHandleDeployPostfixNegative(BaseTest):
 
     def test_case_mismatch_postfix_exits_with_code_1(self, caplog):
         # UC-CC-DP-3: matching is case-sensitive — "Core-Namespace" ≠ "core-namespace".
-        env = self._prepare("single-core")
+        env = self._prepare()
+        _write_namespace(env, "core", "core-namespace")
         sd_data = self._sd_data_with_postfix("Core-Namespace")
 
         with caplog.at_level(logging.ERROR, logger="envgene"):
@@ -199,8 +226,9 @@ class TestHandleDeployPostfixNegative(BaseTest):
 
     def test_bg_base_name_without_suffix_exits_with_code_1(self, caplog):
         # UC-CC-DP-4: only "bss-origin" and "bss-peer" exist; SD uses bare "bss" → no match.
-        import json
-        env = self._prepare("bg-domain")
+        env = self._prepare()
+        _write_namespace(env, "bss-origin", "bss-origin")
+        _write_namespace(env, "bss-peer", "bss-peer")
         sd_data = json.dumps([{
             "version": 1,
             "type": "solutionDeploy",
@@ -216,8 +244,8 @@ class TestHandleDeployPostfixNegative(BaseTest):
 
     def test_missing_peer_side_exits_with_code_1(self, caplog):
         # UC-CC-DP-4: "bss-peer" namespace does not exist; SD references it → exit(1).
-        import json
-        env = self._prepare("single-core")  # only "core" namespace exists
+        env = self._prepare()
+        _write_namespace(env, "core", "core-namespace")  # only "core" namespace exists
         sd_data = json.dumps([{
             "version": 1,
             "type": "solutionDeploy",
