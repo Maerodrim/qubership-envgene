@@ -5,16 +5,22 @@ from pathlib import Path
 
 import pytest
 
+from envgenehelper import openYaml
 from envgenehelper.env_helper import Environment
+from envgenehelper.test_helpers import TestHelpers
 from scripts.build_env.tests.base_test import BaseTest
 
-# Must be set before process_sd import to satisfy module-level getenv_with_error calls
 os.environ.setdefault("ENVIRONMENT_NAME", "env-01")
 os.environ.setdefault("CLUSTER_NAME", "cluster-01")
+os.environ.setdefault("CI_PROJECT_DIR", "/tmp")
+os.environ.setdefault("FULL_ENV_NAME", "cluster-01/env-01")
 
-from process_sd import build_namespace_dict, handle_deploy_postfix_namespace_transformation
+from process_sd import handle_sd
 
-FEATURE_TEST_DIR = "test_deploy_postfix"
+FEATURE_TEST_DIR = "test_handle_deploy_postfix"
+CLUSTER = "cluster-01"
+ENV_NAME = "env-01"
+FULL_ENV_NAME = f"{CLUSTER}/{ENV_NAME}"
 
 
 def _write(path: Path, content: str) -> None:
@@ -22,524 +28,203 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content)
 
 
-def _make_env(base: Path, cluster: str = "cluster-01", env_name: str = "env-01") -> Environment:
-    env_path = base / "environments" / cluster / env_name
-    env_path.mkdir(parents=True, exist_ok=True)
-    return Environment(str(base), cluster, env_name)
+def _copy_namespaces(src_namespaces_dir: Path, env: Environment) -> None:
+    """Copy namespace folder fixtures into the environment's Namespaces directory."""
+    target_ns_dir = Path(env.env_path) / "Namespaces"
+    if target_ns_dir.exists():
+        shutil.rmtree(target_ns_dir)
+    shutil.copytree(src_namespaces_dir, target_ns_dir)
 
 
-def _write_namespace(env: Environment, folder: str, name: str) -> None:
-    ns_file = Path(env.env_path) / "Namespaces" / folder / "namespace.yml"
-    _write(ns_file, f"name: {name}\n")
+def _load_tc(test_data_dir: Path, tc_name: str) -> tuple:
+    file_path = test_data_dir / tc_name / f"{tc_name}.yaml"
+    data = openYaml(file_path)
+    return (
+        data.get("SD_DATA", "{}"),
+        data.get("SD_SOURCE_TYPE", ""),
+        data.get("SD_VERSION", ""),
+        data.get("SD_DELTA", ""),
+        data.get("SD_REPO_MERGE_MODE", "basic-merge"),
+    )
 
 
-# ---------------------------------------------------------------------------
-# build_namespace_dict
-# ---------------------------------------------------------------------------
-
-class TestBuildNamespaceDict(BaseTest):
-    """Unit tests for build_namespace_dict: mapping namespace logical names → folder names."""
+class TestHandleDeployPostfixPositive(BaseTest):
+    """
+    UC-CC-DP-1..3 positive paths exercised through handle_sd():
+    namespace.yml fixtures are placed on disk before each test, handle_sd() processes
+    them, and the resulting sd.yaml is compared against the ER directory.
+    """
 
     def setup_method(self):
-        self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "build_ns_dict"
-        if self.feature_dir.exists():
-            shutil.rmtree(self.feature_dir)
-        self.feature_dir.mkdir(parents=True)
+        self.feature_dir = self.output_dir / FEATURE_TEST_DIR
+        self.test_data_dir = self.test_data_dir / FEATURE_TEST_DIR
+        self.ns_prerequisites = self.test_data_dir / "prerequisites" / "namespaces"
 
-    def _env(self, test_name: str) -> Environment:
-        return _make_env(self.feature_dir / test_name)
+        TestHelpers.clean_test_dir(self.feature_dir)
+        os.environ["CLUSTER_NAME"] = CLUSTER
+        os.environ["ENVIRONMENT_NAME"] = ENV_NAME
+        os.environ["FULL_ENV_NAME"] = FULL_ENV_NAME
+        self.set_ci_project_dir(self.feature_dir)
 
-    # ------------------------------------------------------------------
-    # Positive
-    # ------------------------------------------------------------------
+    def _prepare(self, ns_preset: str) -> Environment:
+        """Create a fresh environment directory with the requested namespace fixtures."""
+        env = Environment(str(self.feature_dir), CLUSTER, ENV_NAME)
+        _copy_namespaces(self.ns_prerequisites / ns_preset, env)
+        return env
 
-    def test_single_namespace_builds_dict(self, caplog):
-        env = self._env("single")
-        _write_namespace(env, "core", "core-namespace")
-
-        with caplog.at_level(logging.INFO, logger="envgene"):
-            result = build_namespace_dict(env)
-
-        assert result == {"core-namespace": "core"}
-        assert "Namespace dict built" in caplog.text
-
-    def test_multiple_namespaces_all_mapped(self):
-        env = self._env("multi")
-        _write_namespace(env, "core", "core-namespace")
-        _write_namespace(env, "bss", "bss-namespace")
-        _write_namespace(env, "monitoring", "monitoring-namespace")
-
-        result = build_namespace_dict(env)
-
-        assert result == {
-            "core-namespace": "core",
-            "bss-namespace": "bss",
-            "monitoring-namespace": "monitoring",
-        }
-
-    def test_bg_origin_peer_folders_mapped(self):
-        # BG Domain environment: origin and peer folders with -origin/-peer suffixes.
-        env = self._env("bg-domain")
-        _write_namespace(env, "bss-origin", "bss-origin")
-        _write_namespace(env, "bss-peer", "bss-peer")
-
-        result = build_namespace_dict(env)
-
-        assert result == {
-            "bss-origin": "bss-origin",
-            "bss-peer": "bss-peer",
-        }
-
-    def test_folder_name_differs_from_logical_name(self):
-        # Folder name and namespace logical name can be different strings.
-        env = self._env("name-mismatch")
-        _write_namespace(env, "folder-abc", "logical-name-xyz")
-
-        result = build_namespace_dict(env)
-
-        assert result == {"logical-name-xyz": "folder-abc"}
+    def _assert_sd(self, env: Environment, tc_name: str) -> None:
+        sd_dir = Path(env.env_path) / "Inventory" / "solution-descriptor"
+        er_dir = self.test_data_dir / "ER" / tc_name
+        TestHelpers.assert_dirs_content(er_dir, sd_dir, check_for_missing_files=True, check_for_extra_files=True)
 
     # ------------------------------------------------------------------
-    # Missing / empty Namespaces directory
+    # TC-DP-001: UC-CC-DP-1 — exact match: logical name → folder name
     # ------------------------------------------------------------------
 
-    def test_missing_namespaces_dir_returns_empty_dict(self, caplog):
-        # Namespaces directory does not exist at all — must return {} without raising.
-        env = self._env("no-ns-dir")
+    def test_tc_dp_001_exact_match_postfix_replaced(self):
+        # UC-CC-DP-1: deployPostfix "core-namespace" == namespace logical name → replaced
+        # with folder name "core". userData removed because only useDeployPostfixAsNamespace present.
+        env = self._prepare("single-core")
+        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-001")
 
-        with caplog.at_level(logging.WARNING, logger="envgene"):
-            result = build_namespace_dict(env)
+        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
 
-        assert result == {}
-        assert "does not exist" in caplog.text
-
-    def test_empty_namespaces_dir_returns_empty_dict(self):
-        # Namespaces directory exists but contains no sub-folders.
-        env = self._env("empty-ns-dir")
-        (Path(env.env_path) / "Namespaces").mkdir(parents=True, exist_ok=True)
-
-        result = build_namespace_dict(env)
-
-        assert result == {}
+        self._assert_sd(env, "TC-DP-001")
 
     # ------------------------------------------------------------------
-    # Folders without namespace.yml are silently skipped
+    # TC-DP-002: UC-CC-DP-2 — BG Domain: origin and peer namespaces both replaced
     # ------------------------------------------------------------------
 
-    def test_folder_without_namespace_yml_is_skipped(self):
-        # A folder exists under Namespaces/ but has no namespace.yml — must be ignored.
-        env = self._env("no-ns-yml")
-        (Path(env.env_path) / "Namespaces" / "orphan-folder").mkdir(parents=True)
-        _write_namespace(env, "valid", "valid-name")
+    def test_tc_dp_002_bg_domain_origin_and_peer_replaced(self):
+        # UC-CC-DP-2: SD has two apps — one for origin, one for peer. Both deployPostfixes
+        # already match their logical names (folder == logical name for BG domain namespaces).
+        env = self._prepare("bg-domain")
+        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-002")
 
-        result = build_namespace_dict(env)
+        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
 
-        assert result == {"valid-name": "valid"}
-        assert "orphan-folder" not in result.values()
-
-    def test_namespace_yml_missing_name_key_is_skipped(self, caplog):
-        # namespace.yml exists but has no 'name' key — must warn and skip.
-        env = self._env("ns-yml-no-name")
-        ns_file = Path(env.env_path) / "Namespaces" / "broken" / "namespace.yml"
-        _write(ns_file, "foo: bar\n")
-
-        with caplog.at_level(logging.WARNING, logger="envgene"):
-            result = build_namespace_dict(env)
-
-        assert result == {}
-        assert "missing or invalid" in caplog.text
+        self._assert_sd(env, "TC-DP-002")
 
     # ------------------------------------------------------------------
-    # Backward compatibility — non-folder entries in Namespaces/ are ignored
+    # TC-DP-003: UC-CC-DP-1 — multiple namespaces, all replaced
     # ------------------------------------------------------------------
 
-    def test_file_at_namespace_level_is_ignored(self):
-        # A file directly under Namespaces/ (not a sub-folder) must not be included.
-        env = self._env("file-in-ns-dir")
-        ns_dir = Path(env.env_path) / "Namespaces"
-        ns_dir.mkdir(parents=True, exist_ok=True)
-        (ns_dir / "stray-file.yml").write_text("name: stray\n")
-        _write_namespace(env, "core", "core-name")
+    def test_tc_dp_003_multiple_namespaces_all_replaced(self):
+        # UC-CC-DP-1: two apps with distinct deployPostfixes — each maps to its folder name.
+        env = self._prepare("multi-ns")
+        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-003")
 
-        result = build_namespace_dict(env)
+        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
 
-        assert result == {"core-name": "core"}
-
-
-# ---------------------------------------------------------------------------
-# handle_deploy_postfix_namespace_transformation
-# ---------------------------------------------------------------------------
-
-class TestHandleDeployPostfixTransformation(BaseTest):
-    """UC-CC-DP-1..4: deployPostfix matching and replacement via useDeployPostfixAsNamespace."""
+        self._assert_sd(env, "TC-DP-003")
 
     # ------------------------------------------------------------------
-    # UC-CC-DP-1: Exact match — flag absent (pass-through)
+    # TC-DP-004: flag absent — SD passes through unchanged
     # ------------------------------------------------------------------
 
-    def test_no_flag_sd_is_unchanged(self):
-        # useDeployPostfixAsNamespace is absent — SD must be returned unchanged.
-        sd = {
-            "applications": [
-                {"deployPostfix": "core", "version": "app:1.0"},
-            ]
-        }
-        namespace_dict = {"core-namespace": "core"}
+    def test_tc_dp_004_no_flag_sd_unchanged(self):
+        # Backward compat: without useDeployPostfixAsNamespace the deployPostfix values
+        # must reach the output sd.yaml exactly as provided.
+        env = self._prepare("single-core")
+        sd_data, sd_source_type, sd_version, sd_delta, sd_merge_mode = _load_tc(self.test_data_dir, "TC-DP-004")
 
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
+        handle_sd(env, sd_source_type, sd_version, sd_data, sd_delta, sd_merge_mode)
 
-        assert result["applications"][0]["deployPostfix"] == "core"
+        self._assert_sd(env, "TC-DP-004")
 
-    def test_flag_false_sd_is_unchanged(self):
-        # useDeployPostfixAsNamespace is explicitly False — no replacement.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": False},
-            "applications": [{"deployPostfix": "core"}],
-        }
-        namespace_dict = {"core-namespace": "core"}
 
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
+class TestHandleDeployPostfixNegative(BaseTest):
+    """
+    UC-CC-DP-3 / UC-CC-DP-4 negative paths: handle_sd() must call exit(1) when
+    deployPostfix cannot be matched to any namespace in the environment.
+    """
 
-        assert result["applications"][0]["deployPostfix"] == "core"
-        assert "useDeployPostfixAsNamespace" in result.get("userData", {})
+    def setup_method(self):
+        self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "negative"
+        self.test_data_dir_base = self.test_data_dir / FEATURE_TEST_DIR
+        self.ns_prerequisites = self.test_data_dir_base / "prerequisites" / "namespaces"
 
-    # ------------------------------------------------------------------
-    # UC-CC-DP-1: Exact match — flag True, single app
-    # ------------------------------------------------------------------
+        TestHelpers.clean_test_dir(self.feature_dir)
+        os.environ["CLUSTER_NAME"] = CLUSTER
+        os.environ["ENVIRONMENT_NAME"] = ENV_NAME
+        os.environ["FULL_ENV_NAME"] = FULL_ENV_NAME
+        self.set_ci_project_dir(self.feature_dir)
 
-    def test_flag_true_replaces_postfix_with_folder_name(self, caplog):
-        # UC-CC-DP-1: deployPostfix == namespace logical name → replaced with folder name.
-        sd = {
+    def _prepare(self, ns_preset: str) -> Environment:
+        env = Environment(str(self.feature_dir), CLUSTER, ENV_NAME)
+        _copy_namespaces(self.ns_prerequisites / ns_preset, env)
+        return env
+
+    def _sd_data_with_postfix(self, postfix: str) -> str:
+        import json
+        return json.dumps([{
+            "version": 1,
+            "type": "solutionDeploy",
+            "applications": [{"version": "app:1.0", "deployPostfix": postfix}],
             "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "core-namespace", "version": "app:1.0"}],
-        }
-        namespace_dict = {"core-namespace": "core"}
-
-        with caplog.at_level(logging.INFO, logger="envgene"):
-            result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        assert result["applications"][0]["deployPostfix"] == "core"
-        assert "core-namespace" in caplog.text  # logged the replacement
-        # userData with only useDeployPostfixAsNamespace must be removed entirely
-        assert "userData" not in result
-
-    def test_flag_true_multiple_apps_all_replaced(self):
-        # UC-CC-DP-1: multiple apps in SD — each deployPostfix is replaced independently.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [
-                {"deployPostfix": "core-namespace"},
-                {"deployPostfix": "bss-namespace"},
-            ],
-        }
-        namespace_dict = {"core-namespace": "core", "bss-namespace": "bss"}
-
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        postfixes = [app["deployPostfix"] for app in result["applications"]]
-        assert postfixes == ["core", "bss"]
+        }])
 
     # ------------------------------------------------------------------
-    # UC-CC-DP-2: BG Domain match — origin/peer folder names
+    # UC-CC-DP-3: no exact match → exit(1)
     # ------------------------------------------------------------------
 
-    def test_bg_both_origin_and_peer_replaced_in_single_sd(self):
-        # UC-CC-DP-2: one SD with both origin and peer apps — both replaced correctly.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [
-                {"deployPostfix": "bss-origin"},
-                {"deployPostfix": "bss-peer"},
-            ],
-        }
-        namespace_dict = {"bss-origin": "bss-origin", "bss-peer": "bss-peer"}
-
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        postfixes = {app["deployPostfix"] for app in result["applications"]}
-        assert postfixes == {"bss-origin", "bss-peer"}
-
-    # ------------------------------------------------------------------
-    # UC-CC-DP-3 / UC-CC-DP-4: No match found — must call exit(1)
-    # ------------------------------------------------------------------
-
-    def test_no_match_for_postfix_calls_exit(self, caplog):
-        # UC-CC-DP-3: no exact match exists → must log error and exit(1).
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "unknown-namespace"}],
-        }
-        namespace_dict = {"core-namespace": "core"}
+    def test_unknown_postfix_exits_with_code_1(self, caplog):
+        # UC-CC-DP-3: deployPostfix "unknown-namespace" does not match any namespace
+        # logical name → handle_sd must call exit(1).
+        env = self._prepare("single-core")
+        sd_data = self._sd_data_with_postfix("unknown-namespace")
 
         with caplog.at_level(logging.ERROR, logger="envgene"):
             with pytest.raises(SystemExit) as exc_info:
-                handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
+                handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
         assert exc_info.value.code == 1
         assert "No replacement found" in caplog.text
         assert "unknown-namespace" in caplog.text
 
-    def test_empty_namespace_dict_calls_exit(self, caplog):
-        # No namespaces at all — any deployPostfix must fail.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "core-namespace"}],
-        }
-
-        with caplog.at_level(logging.ERROR, logger="envgene"):
-            with pytest.raises(SystemExit):
-                handle_deploy_postfix_namespace_transformation(sd, {})
-
-    # ------------------------------------------------------------------
-    # userData cleanup behavior
-    # ------------------------------------------------------------------
-
-    def test_extra_user_data_keys_preserved(self):
-        # userData has other keys besides useDeployPostfixAsNamespace → remove only the flag.
-        sd = {
-            "userData": {
-                "useDeployPostfixAsNamespace": True,
-                "otherKey": "some-value",
-            },
-            "applications": [{"deployPostfix": "core-namespace"}],
-        }
-        namespace_dict = {"core-namespace": "core"}
-
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        assert "userData" in result
-        assert "useDeployPostfixAsNamespace" not in result["userData"]
-        assert result["userData"]["otherKey"] == "some-value"
-
-    # ------------------------------------------------------------------
-    # Edge cases — structural anomalies
-    # ------------------------------------------------------------------
-
-    def test_app_without_deploy_postfix_key_is_unchanged(self):
-        # Application dict without deployPostfix key must be left untouched (no KeyError).
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [
-                {"version": "app:1.0"},  # no deployPostfix
-                {"deployPostfix": "core-namespace"},
-            ],
-        }
-        namespace_dict = {"core-namespace": "core"}
-
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        assert result["applications"][0].get("deployPostfix") is None
-        assert result["applications"][1]["deployPostfix"] == "core"
-
-    def test_deploy_postfix_non_string_is_unchanged(self):
-        # deployPostfix with non-string value (e.g. None) must not be transformed.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [
-                {"deployPostfix": None},
-                {"deployPostfix": "core-namespace"},
-            ],
-        }
-        namespace_dict = {"core-namespace": "core"}
-
-        result = handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        assert result["applications"][0]["deployPostfix"] is None
-        assert result["applications"][1]["deployPostfix"] == "core"
-
-    def test_empty_applications_list_returns_unchanged(self):
-        # No apps in SD — transformation must succeed silently.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [],
-        }
-
-        result = handle_deploy_postfix_namespace_transformation(sd, {})
-
-        assert result["applications"] == []
-        assert "userData" not in result
-
-    def test_no_applications_key_returns_unchanged(self):
-        # SD without applications key — must not raise.
-        sd = {"userData": {"useDeployPostfixAsNamespace": True}}
-
-        result = handle_deploy_postfix_namespace_transformation(sd, {})
-
-        assert "applications" not in result
-
-    # ------------------------------------------------------------------
-    # Backward compatibility — flag absent in older SDs
-    # ------------------------------------------------------------------
-
-    def test_sd_without_user_data_is_unchanged(self):
-        # Older SDs have no userData at all — must pass through without modification.
-        sd = {
-            "applications": [
-                {"deployPostfix": "bss", "version": "bss-app:1.2"},
-            ]
-        }
-
-        result = handle_deploy_postfix_namespace_transformation(sd, {"bss": "bss"})
-
-        assert result["applications"][0]["deployPostfix"] == "bss"
-        assert "userData" not in result
-
-    def test_sd_with_non_dict_user_data_is_unchanged(self):
-        # userData is not a dict (e.g. null / string from malformed YAML) — must not crash.
-        sd = {
-            "userData": None,
-            "applications": [{"deployPostfix": "core"}],
-        }
-
-        result = handle_deploy_postfix_namespace_transformation(sd, {"core": "core"})
-
-        assert result["applications"][0]["deployPostfix"] == "core"
-
-
-# ---------------------------------------------------------------------------
-# Negative scenarios — integration of build_namespace_dict + transformation
-# ---------------------------------------------------------------------------
-
-class TestDeployPostfixNegativeScenarios(BaseTest):
-    """Negative cases: mismatches, partial failures, and structural errors."""
-
-    def setup_method(self):
-        self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "negative"
-        if self.feature_dir.exists():
-            shutil.rmtree(self.feature_dir)
-        self.feature_dir.mkdir(parents=True)
-
-    def _env(self, test_name: str) -> Environment:
-        return _make_env(self.feature_dir / test_name)
-
-    # ------------------------------------------------------------------
-    # UC-CC-DP-3: exact match not found
-    # ------------------------------------------------------------------
-
-    def test_postfix_case_mismatch_not_matched(self, caplog):
-        # UC-CC-DP-3: "Core-Namespace" (uppercase) does not match "core-namespace" (lowercase).
-        # Matching is case-sensitive — must exit(1).
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "Core-Namespace"}],
-        }
-        namespace_dict = {"core-namespace": "core"}
+    def test_case_mismatch_postfix_exits_with_code_1(self, caplog):
+        # UC-CC-DP-3: matching is case-sensitive — "Core-Namespace" ≠ "core-namespace".
+        env = self._prepare("single-core")
+        sd_data = self._sd_data_with_postfix("Core-Namespace")
 
         with caplog.at_level(logging.ERROR, logger="envgene"):
             with pytest.raises(SystemExit) as exc_info:
-                handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
+                handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
         assert exc_info.value.code == 1
-        assert "Core-Namespace" in caplog.text
 
-    def test_postfix_with_trailing_space_not_matched(self, caplog):
-        # Whitespace-padded deployPostfix must not accidentally match real namespace name.
-        sd = {
+    # ------------------------------------------------------------------
+    # UC-CC-DP-4: BG domain namespaces present but wrong postfix used → exit(1)
+    # ------------------------------------------------------------------
+
+    def test_bg_base_name_without_suffix_exits_with_code_1(self, caplog):
+        # UC-CC-DP-4: only "bss-origin" and "bss-peer" exist; SD uses bare "bss" → no match.
+        import json
+        env = self._prepare("bg-domain")
+        sd_data = json.dumps([{
+            "version": 1,
+            "type": "solutionDeploy",
+            "applications": [{"version": "bss-app:1.0", "deployPostfix": "bss"}],
             "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "core-namespace "}],  # trailing space
-        }
-        namespace_dict = {"core-namespace": "core"}
-
-        with caplog.at_level(logging.ERROR, logger="envgene"):
-            with pytest.raises(SystemExit):
-                handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-    def test_first_app_matches_second_does_not_exits(self, caplog):
-        # UC-CC-DP-3: first app resolves fine, second fails → exit(1) on the second.
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [
-                {"deployPostfix": "core-namespace"},   # matches
-                {"deployPostfix": "unknown-namespace"},  # does not match
-            ],
-        }
-        namespace_dict = {"core-namespace": "core"}
+        }])
 
         with caplog.at_level(logging.ERROR, logger="envgene"):
             with pytest.raises(SystemExit) as exc_info:
-                handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
+                handle_sd(env, "json", "", sd_data, "", "basic-merge")
 
         assert exc_info.value.code == 1
-        assert "unknown-namespace" in caplog.text
 
-    # ------------------------------------------------------------------
-    # UC-CC-DP-4: BG domain namespaces present but deployPostfix doesn't match any
-    # ------------------------------------------------------------------
-
-    def test_bg_postfix_without_suffix_not_matched(self, caplog):
-        # UC-CC-DP-4: SD has deployPostfix "bss" but only "bss-origin"/"bss-peer" folders exist.
-        # No exact match → exit(1).
-        sd = {
+    def test_missing_peer_side_exits_with_code_1(self, caplog):
+        # UC-CC-DP-4: "bss-peer" namespace does not exist; SD references it → exit(1).
+        import json
+        env = self._prepare("single-core")  # only "core" namespace exists
+        sd_data = json.dumps([{
+            "version": 1,
+            "type": "solutionDeploy",
+            "applications": [{"version": "peer-app:1.0", "deployPostfix": "bss-peer"}],
             "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "bss"}],
-        }
-        namespace_dict = {"bss-origin": "bss-origin", "bss-peer": "bss-peer"}
-
-        with caplog.at_level(logging.ERROR, logger="envgene"):
-            with pytest.raises(SystemExit) as exc_info:
-                handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-        assert exc_info.value.code == 1
-        assert "bss" in caplog.text
-
-    def test_partial_bg_match_wrong_side_not_matched(self, caplog):
-        # "bss-origin" exists as folder but SD uses "bss-peer" logical name and
-        # there is no "bss-peer" → "bss-peer" key missing from namespace_dict → exit(1).
-        sd = {
-            "userData": {"useDeployPostfixAsNamespace": True},
-            "applications": [{"deployPostfix": "bss-peer"}],
-        }
-        namespace_dict = {"bss-origin": "bss-origin"}  # peer side missing
+        }])
 
         with caplog.at_level(logging.ERROR, logger="envgene"):
             with pytest.raises(SystemExit):
-                handle_deploy_postfix_namespace_transformation(sd, namespace_dict)
-
-    # ------------------------------------------------------------------
-    # build_namespace_dict — negative
-    # ------------------------------------------------------------------
-
-    def test_namespace_yml_with_integer_name_is_skipped(self, caplog):
-        # namespace.yml with a non-string 'name' (e.g. integer) must be skipped with warning.
-        env = self._env("int-name")
-        ns_file = Path(env.env_path) / "Namespaces" / "ns1" / "namespace.yml"
-        _write(ns_file, "name: 12345\n")
-
-        with caplog.at_level(logging.WARNING, logger="envgene"):
-            result = build_namespace_dict(env)
-
-        assert result == {}
-        assert "missing or invalid" in caplog.text
-
-    def test_namespace_yml_empty_name_is_skipped(self, caplog):
-        # Empty string name is falsy — same branch as missing name → warning + skip.
-        env = self._env("empty-name")
-        ns_file = Path(env.env_path) / "Namespaces" / "ns1" / "namespace.yml"
-        _write(ns_file, "name: ''\n")
-
-        with caplog.at_level(logging.WARNING, logger="envgene"):
-            result = build_namespace_dict(env)
-
-        assert result == {}
-        assert "missing or invalid" in caplog.text
-
-    def test_duplicate_logical_names_last_wins(self):
-        # Two namespace folders with the same logical name — last processed wins (dict behavior).
-        env = self._env("duplicate-name")
-        _write_namespace(env, "folder-a", "same-logical-name")
-        _write_namespace(env, "folder-b", "same-logical-name")
-
-        result = build_namespace_dict(env)
-
-        # Only one entry survives; the value is one of the two folder names.
-        assert "same-logical-name" in result
-        assert result["same-logical-name"] in ("folder-a", "folder-b")
-
-    def test_namespace_yml_malformed_yaml_raises(self):
-        # Completely malformed YAML in namespace.yml — must raise (no silent skip).
-        env = self._env("malformed-yml")
-        ns_file = Path(env.env_path) / "Namespaces" / "ns1" / "namespace.yml"
-        _write(ns_file, ": :\n  bad: [yaml\n")
-
-        with pytest.raises(Exception):
-            build_namespace_dict(env)
+                handle_sd(env, "json", "", sd_data, "", "basic-merge")
