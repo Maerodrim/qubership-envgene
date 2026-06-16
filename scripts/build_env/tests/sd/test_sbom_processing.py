@@ -116,12 +116,14 @@ class TestBuildCliCmdSbomWiring(BaseTest):
     and --app_chart_validation (UC-ES-DEP-A16 / A18) into the CLI command
     passed to the Java effective-set-generator.
 
-    Note — UC-ES-DEP-20 (collision routing): the collision logic itself
-    (service-name key detection, split into collision-deployment-parameters.yaml)
-    runs entirely inside the Java Calculator and is not reachable from Python.
-    The Python-level contract for UC-ES-DEP-20 is that --sboms-path and --sd-path
-    are both forwarded to the CLI (covered by test_sboms_path_included_when_sd_file_exists
-    and test_sd_path_and_registries_present_with_sboms_path below).
+    Note — UC-ES-DEP-20 (collision routing), UC-ES-DEP-A9 (deploy-descriptor.yaml),
+    UC-ES-DEP-A11 (per-service-parameters layout and resource profiles): all of this
+    logic runs entirely inside the Java Calculator (BomReaderUtilsImplV2,
+    ParametersCalculationServiceV2, CliParameterParser, HelmNameNormalizer) and is
+    not reachable from Python. The Python-level contract for all three UCs is that
+    --sboms-path and --sd-path are both forwarded to the CLI (covered by
+    test_sboms_path_included_when_sd_file_exists and
+    test_sd_path_and_registries_present_with_sboms_path below).
     End-to-end verification lives in CmdbCliTest.java (build_effective_set_generator/
     effective-set-generator/src/test/java/.../CmdbCliTest.java).
     """
