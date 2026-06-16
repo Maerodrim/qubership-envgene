@@ -107,139 +107,6 @@ def _sbom(app_name: str, components: list) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Python reference implementation of BomReaderUtilsImplV2.addImageParameters
-# ---------------------------------------------------------------------------
-
-def _extract_deploy_params(sbom: dict) -> dict:
-    """
-    Python reference of the Java addImageParameters deploy_param filtering rule
-    (BomReaderUtilsImplV2, lines 332-340):
-
-    For each application/octet-stream component with a non-empty deploy_param:
-    - deploy_param equals a service component name → OMIT from root deployment params.
-    - Otherwise → include as  deploy_param: full_image_name  in root deployment params.
-    """
-    components = sbom.get("components", [])
-    service_names = {
-        c["name"]
-        for c in components
-        if c.get("mime-type") == "application/vnd.qubership.service"
-    }
-    result = {}
-    for comp in components:
-        if comp.get("mime-type") == "application/octet-stream":
-            props = {p["name"]: p["value"] for p in comp.get("properties", [])}
-            key = props.get("deploy_param", "")
-            if key and key not in service_names:
-                result[key] = props.get("full_image_name")
-    return result
-
-
-# ---------------------------------------------------------------------------
-# UC-ES-DEP-14: deploy_param image key filtering
-# ---------------------------------------------------------------------------
-
-class TestDeployParamFiltering(BaseTest):
-    """
-    UC-ES-DEP-14 — The Calculator derives root deployment parameters from
-    application/octet-stream SBOM components.
-
-    Rule (BomReaderUtilsImplV2.addImageParameters):
-    - deploy_param non-empty AND NOT a service name → included as root key.
-    - deploy_param equals a service name → omitted from root deployment parameters.
-
-    Tested via a Python reference implementation of the Java filtering rule
-    applied to programmatically built CycloneDX SBOM fixtures.
-    """
-
-    def test_uc_dep_14_non_service_deploy_param_becomes_root_key(self):
-        # UC-ES-DEP-14: IMAGE_QA_KEY is not a service name → appears in root params.
-        sbom = _sbom("my-app", [
-            _image_component(
-                "qa-image",
-                deploy_param="IMAGE_QA_KEY",
-                full_image_name="registry.example.local/ns/app:1.2.3",
-            ),
-        ])
-        params = _extract_deploy_params(sbom)
-        assert "IMAGE_QA_KEY" in params, (
-            f"IMAGE_QA_KEY must be present in root deploy params; got: {params}"
-        )
-        assert params["IMAGE_QA_KEY"] == "registry.example.local/ns/app:1.2.3"
-
-    def test_uc_dep_14_deploy_param_matching_service_name_omitted(self):
-        # UC-ES-DEP-14: deploy_param "billing-service" matches a service component
-        # with the same name → must be omitted from root deployment parameters.
-        sbom = _sbom("my-app", [
-            _service_component("billing-service"),
-            _image_component(
-                "billing-image",
-                deploy_param="billing-service",
-                full_image_name="registry.example.local/ns/billing:9.0.0",
-            ),
-        ])
-        params = _extract_deploy_params(sbom)
-        assert "billing-service" not in params, (
-            f"billing-service must be omitted (it is a service name); got: {params}"
-        )
-
-    def test_uc_dep_14_combined_scenario_key_present_service_omitted(self):
-        # UC-ES-DEP-14: full UC scenario — both components present.
-        # IMAGE_QA_KEY must survive; billing-service must be dropped.
-        sbom = _sbom("my-app", [
-            _service_component("billing-service"),
-            _image_component(
-                "qa-image",
-                deploy_param="IMAGE_QA_KEY",
-                full_image_name="registry.example.local/ns/app:1.2.3",
-            ),
-            _image_component(
-                "billing-image",
-                deploy_param="billing-service",
-                full_image_name="registry.example.local/ns/billing:9.0.0",
-            ),
-        ])
-        params = _extract_deploy_params(sbom)
-        assert "IMAGE_QA_KEY" in params
-        assert params["IMAGE_QA_KEY"] == "registry.example.local/ns/app:1.2.3"
-        assert "billing-service" not in params
-
-    def test_uc_dep_14_empty_deploy_param_not_included(self):
-        # deploy_param="" → the component contributes no root key.
-        sbom = _sbom("my-app", [
-            _image_component(
-                "no-key-image",
-                deploy_param="",
-                full_image_name="registry.example.local/ns/app:1.0.0",
-            ),
-        ])
-        params = _extract_deploy_params(sbom)
-        assert params == {}, f"empty deploy_param must not produce any root key; got: {params}"
-
-    def test_uc_dep_14_multiple_non_service_params_all_included(self):
-        # Multiple non-service deploy_param values all appear in root params.
-        sbom = _sbom("my-app", [
-            _image_component("img1", deploy_param="KEY_ONE",
-                             full_image_name="registry.example.local/ns/one:1.0"),
-            _image_component("img2", deploy_param="KEY_TWO",
-                             full_image_name="registry.example.local/ns/two:2.0"),
-        ])
-        params = _extract_deploy_params(sbom)
-        assert "KEY_ONE" in params
-        assert "KEY_TWO" in params
-        assert params["KEY_ONE"] == "registry.example.local/ns/one:1.0"
-        assert params["KEY_TWO"] == "registry.example.local/ns/two:2.0"
-
-    def test_uc_dep_14_non_octet_stream_component_ignored(self):
-        # Only application/octet-stream components contribute to root deploy params.
-        sbom = _sbom("my-app", [
-            _service_component("my-service"),
-        ])
-        params = _extract_deploy_params(sbom)
-        assert params == {}
-
-
-# ---------------------------------------------------------------------------
 # UC-ES-DEP-14 / A16 / A18: CLI command wiring
 # ---------------------------------------------------------------------------
 
@@ -248,6 +115,15 @@ class TestBuildCliCmdSbomWiring(BaseTest):
     Verifies that _build_cli_cmd correctly wires --sboms-path (UC-ES-DEP-14)
     and --app_chart_validation (UC-ES-DEP-A16 / A18) into the CLI command
     passed to the Java effective-set-generator.
+
+    Note — UC-ES-DEP-20 (collision routing): the collision logic itself
+    (service-name key detection, split into collision-deployment-parameters.yaml)
+    runs entirely inside the Java Calculator and is not reachable from Python.
+    The Python-level contract for UC-ES-DEP-20 is that --sboms-path and --sd-path
+    are both forwarded to the CLI (covered by test_sboms_path_included_when_sd_file_exists
+    and test_sd_path_and_registries_present_with_sboms_path below).
+    End-to-end verification lives in CmdbCliTest.java (build_effective_set_generator/
+    effective-set-generator/src/test/java/.../CmdbCliTest.java).
     """
 
     def setup_method(self):
