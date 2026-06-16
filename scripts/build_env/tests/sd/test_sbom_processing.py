@@ -470,3 +470,68 @@ class TestHandleEffectiveSetConfigConsumers(BaseTest):
         config = self._config([{"schema": self._SCHEMA}])
         result = handle_effective_set_config(config)
         assert not any("pipeline-consumer-specific-schema-path" in f for f in result["extra_args"])
+
+
+# ---------------------------------------------------------------------------
+# UC-ES-NOSBOM-1: No SBOMs Mode — CLI command omits SD/SBOM flags
+# ---------------------------------------------------------------------------
+
+class TestNoSbomMode(BaseTest):
+    """
+    UC-ES-NOSBOM-1 — when no Solution Descriptor is present, the Calculator
+    is invoked without --sd-path, --sboms-path, and --registries, which causes
+    the Java side to generate only Pipeline and Topology contexts.
+
+    Python-level contract: _build_cli_cmd receives a non-existent sd_path and
+    must omit all three SD-related flags from the command.  The fact that only
+    pipeline/ and topology/ directories are produced is Java-side behaviour
+    verified in CmdbCliTest.java.
+    """
+
+    def setup_method(self):
+        self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "no_sbom"
+        if self.feature_dir.exists():
+            shutil.rmtree(self.feature_dir)
+        self.feature_dir.mkdir(parents=True)
+        for var in ("EFFECTIVE_SET_CONFIG", "DEPLOYMENT_SESSION_ID", "CUSTOM_PARAMS"):
+            os.environ.pop(var, None)
+
+    def teardown_method(self):
+        for var in ("EFFECTIVE_SET_CONFIG", "DEPLOYMENT_SESSION_ID", "CUSTOM_PARAMS"):
+            os.environ.pop(var, None)
+
+    def test_no_sd_path_flag_when_sd_file_absent(self):
+        # UC-ES-NOSBOM-1: absent sd file → --sd-path omitted from CLI command.
+        sd_path = self.feature_dir / "nonexistent_sd.yaml"
+        cmd = _build_cli_cmd(self.feature_dir / "es", "cluster-01/env-01", sd_path)
+        assert "--sd-path" not in cmd
+
+    def test_no_sboms_path_flag_when_sd_file_absent(self):
+        # UC-ES-NOSBOM-1: absent sd file → --sboms-path omitted.
+        sd_path = self.feature_dir / "nonexistent_sd.yaml"
+        cmd = _build_cli_cmd(self.feature_dir / "es", "cluster-01/env-01", sd_path)
+        assert "--sboms-path" not in cmd
+
+    def test_no_registries_flag_when_sd_file_absent(self):
+        # UC-ES-NOSBOM-1: absent sd file → --registries omitted.
+        sd_path = self.feature_dir / "nonexistent_sd.yaml"
+        cmd = _build_cli_cmd(self.feature_dir / "es", "cluster-01/env-01", sd_path)
+        assert "--registries" not in cmd
+
+    def test_env_id_and_output_still_present_in_no_sbom_mode(self):
+        # UC-ES-NOSBOM-1: --env-id and --output must be present regardless of SD mode —
+        # they are required for both full and No SBOMs generation.
+        sd_path = self.feature_dir / "nonexistent_sd.yaml"
+        es_dir = self.feature_dir / "es"
+        cmd = _build_cli_cmd(es_dir, "cluster-01/env-01", sd_path)
+        assert "--env-id=cluster-01/env-01" in cmd
+        assert f"--output={es_dir}" in cmd
+
+    def test_all_three_sd_flags_present_when_sd_file_exists(self):
+        # UC-ES-NOSBOM-1 contrast: all three flags appear only when sd file exists.
+        sd_path = self.feature_dir / "sd.yaml"
+        sd_path.write_text("applications: []\n")
+        cmd = _build_cli_cmd(self.feature_dir / "es", "cluster-01/env-01", sd_path)
+        assert "--sd-path" in cmd
+        assert "--sboms-path" in cmd
+        assert "--registries" in cmd

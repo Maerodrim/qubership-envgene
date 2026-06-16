@@ -439,33 +439,176 @@ class TestPipelineOutputFiles(BaseTest):
 
 
 # ---------------------------------------------------------------------------
-# UC-ES-CLN-3: cleanup output files exist
+# UC-ES-CLN-1 / UC-ES-CLN-2 / UC-ES-CLN-3: cleanup context content
 # ---------------------------------------------------------------------------
 
-class TestCleanupOutputFiles(BaseTest):
+class TestCleanupContext(BaseTest):
     """
-    UC-ES-CLN-3 — cleanup/parameters.yaml and cleanup/credentials.yaml exist
-    for each namespace; credentials.yaml contains K8S_TOKEN.
+    UC-ES-CLN-1 — cleanup/parameters.yaml per namespace, merged non-sensitive
+    deploy parameters from Tenant, Cloud, Namespace hierarchy.
+
+    UC-ES-CLN-2 — cleanup/credentials.yaml per namespace, contains K8S_TOKEN
+    and storage credential keys; custom runtime params override with higher
+    priority (Java Calculator behaviour, not testable here — see CmdbCliTest.java).
+
+    UC-ES-CLN-3 — cleanup/mapping.yaml namespace keys match disk folder names.
     """
 
-    def test_cleanup_parameters_yaml_exists_for_monitoring(self):
-        assert _exists("cleanup/monitoring-origin/parameters.yaml")
+    # Storage-level credential keys that belong in credentials.yaml only.
+    _CLEANUP_CREDENTIAL_KEYS = frozenset({
+        "K8S_TOKEN",
+        "STORAGE_PASSWORD", "STORAGE_USERNAME",
+        "CDN_STORAGE_PASSWORD", "CDN_STORAGE_USERNAME",
+        "DOC_STORAGE_PASSWORD", "DOC_STORAGE_USERNAME",
+    })
 
-    def test_cleanup_credentials_yaml_exists_for_monitoring(self):
-        assert _exists("cleanup/monitoring-origin/credentials.yaml")
+    # ------------------------------------------------------------------ CLN-1
+
+    def test_cleanup_parameters_yaml_exists_for_all_namespaces(self):
+        # UC-ES-CLN-1: parameters file is written per namespace, not per application.
+        for ns in ("monitoring-origin", "pg"):
+            assert _exists(f"cleanup/{ns}/parameters.yaml"), (
+                f"cleanup/{ns}/parameters.yaml must exist"
+            )
+
+    def test_cleanup_params_contains_identity_keys(self):
+        # UC-ES-CLN-1: identity / cloud keys always written to cleanup/parameters.yaml.
+        params = _load("cleanup/monitoring-origin/parameters.yaml")
+        for key in ("NAMESPACE", "TENANTNAME", "CLOUD_API_HOST"):
+            assert key in params, f"identity key '{key}' missing from cleanup/parameters.yaml"
+
+    def test_cleanup_params_namespace_value_matches_actual_namespace(self):
+        # UC-ES-CLN-1: NAMESPACE value equals the actual k8s namespace, not the deployPostfix.
+        params = _load("cleanup/monitoring-origin/parameters.yaml")
+        assert params["NAMESPACE"] == "pl-01-monitoring"
+
+    def test_cleanup_credential_keys_absent_from_parameters(self):
+        # UC-ES-CLN-1 / CLN-2: storage credential keys must not appear in
+        # parameters.yaml — they belong in credentials.yaml only.
+        params = set(_load("cleanup/monitoring-origin/parameters.yaml").keys())
+        found = self._CLEANUP_CREDENTIAL_KEYS & params
+        assert not found, (
+            f"cleanup credential keys must not be in parameters.yaml: {found}"
+        )
+
+    # ------------------------------------------------------------------ CLN-2
+
+    def test_cleanup_credentials_yaml_exists_for_all_namespaces(self):
+        # UC-ES-CLN-2: credentials file is written per namespace.
+        for ns in ("monitoring-origin", "pg"):
+            assert _exists(f"cleanup/{ns}/credentials.yaml"), (
+                f"cleanup/{ns}/credentials.yaml must exist"
+            )
 
     def test_cleanup_credentials_contains_k8s_token(self):
-        # UC-ES-CLN-3 / UC-ES-DEP-A6: K8S_TOKEN in cleanup credentials as well.
-        creds = _load("cleanup/monitoring-origin/credentials.yaml")
-        assert "K8S_TOKEN" in creds
+        # UC-ES-CLN-2: K8S_TOKEN always in cleanup/credentials.yaml (used to
+        # authenticate cleanup operations against the k8s API).
+        for ns in ("monitoring-origin", "pg"):
+            creds = _load(f"cleanup/{ns}/credentials.yaml")
+            assert "K8S_TOKEN" in creds, (
+                f"K8S_TOKEN missing from cleanup/{ns}/credentials.yaml"
+            )
 
-    def test_topology_files_exist(self):
-        # Topology parameters and credentials written for BG domain context.
+    def test_cleanup_credentials_contains_storage_credential_keys(self):
+        # UC-ES-CLN-2: sensitive storage credentials written to cleanup/credentials.yaml.
+        creds = _load("cleanup/monitoring-origin/credentials.yaml")
+        for key in ("STORAGE_PASSWORD", "STORAGE_USERNAME",
+                    "CDN_STORAGE_PASSWORD", "CDN_STORAGE_USERNAME"):
+            assert key in creds, (
+                f"storage credential key '{key}' missing from cleanup/credentials.yaml"
+            )
+
+    def test_cleanup_credential_keys_not_duplicated_in_parameters(self):
+        # UC-ES-CLN-2: no storage credential key can appear in both
+        # cleanup/credentials.yaml and cleanup/parameters.yaml.
+        params = set(_load("cleanup/monitoring-origin/parameters.yaml").keys())
+        overlap = self._CLEANUP_CREDENTIAL_KEYS & params
+        assert not overlap, (
+            f"cleanup credential keys must not appear in parameters.yaml: {overlap}"
+        )
+
+    # ------------------------------------------------------------------ CLN-3
+
+    def test_cleanup_mapping_namespace_folders_exist(self):
+        # UC-ES-CLN-3: every namespace path in cleanup/mapping.yaml must point
+        # to an existing folder on disk.
+        for key, val in _load("cleanup/mapping.yaml").items():
+            ns_folder = val.split("/effective-set/cleanup/")[-1]
+            assert (_FIXTURES / "cleanup" / ns_folder).is_dir(), (
+                f"cleanup mapping '{key}' → folder 'cleanup/{ns_folder}' does not exist"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Topology output files (UC-ES-PIPE-1 / UC-ES-NOSBOM-1)
+# ---------------------------------------------------------------------------
+
+class TestTopologyOutputFiles(BaseTest):
+    """
+    Topology and Pipeline files are generated in all modes (full generation
+    and No SBOMs Mode).
+
+    Note — UC-ES-NOSBOM-1: when the Calculator is invoked without --sd-path,
+    --sboms-path, --registries (Python-level: _build_cli_cmd receives a
+    non-existent sd_path), only pipeline/ and topology/ are produced;
+    deployment/, runtime/, and cleanup/ are not written.  The Python-level
+    wiring is tested in test_sbom_processing.py::TestNoSbomMode.  The
+    directory-absence assertion is Java-side and verified in CmdbCliTest.java.
+    """
+
+    def test_topology_parameters_yaml_exists(self):
         assert _exists("topology/parameters.yaml")
+
+    def test_topology_credentials_yaml_exists(self):
         assert _exists("topology/credentials.yaml")
 
-    def test_topology_parameters_contains_cluster_and_namespaces(self):
-        # topology/parameters.yaml has cluster config and namespace mapping.
+    def test_topology_parameters_contains_cluster_section(self):
+        # topology/parameters.yaml has cluster block with API coordinates.
         params = _load("topology/parameters.yaml")
         assert "cluster" in params
+        cluster = params["cluster"]
+        for key in ("api_url", "api_port", "protocol", "public_url"):
+            assert key in cluster, f"cluster.{key} missing from topology/parameters.yaml"
+
+    def test_topology_parameters_contains_environments_section(self):
+        # topology/parameters.yaml: environments.<cluster>/<env>.namespaces with deployPostfix.
+        params = _load("topology/parameters.yaml")
         assert "environments" in params
+        namespaces = params["environments"]["cluster-01/pl-01"]["namespaces"]
+        assert "pl-01-monitoring" in namespaces
+        assert "pl-01-pg" in namespaces
+
+    def test_topology_deploy_postfixes_match_deployment_mapping_paths(self):
+        # topology/parameters.yaml deployPostfix values must correspond to namespace
+        # folder names referenced in deployment/mapping.yaml.
+        topo = _load("topology/parameters.yaml")
+        mapping_paths = " ".join(_load("deployment/mapping.yaml").values())
+        namespaces = topo["environments"]["cluster-01/pl-01"]["namespaces"]
+        for ns_name, ns_data in namespaces.items():
+            postfix = ns_data["deployPostfix"]
+            assert postfix in mapping_paths, (
+                f"deployPostfix '{postfix}' for namespace '{ns_name}' "
+                "not found in any deployment mapping path"
+            )
+
+    def test_topology_credentials_contains_k8s_tokens_per_namespace(self):
+        # topology/credentials.yaml: k8s_tokens map keyed by namespace name.
+        creds = _load("topology/credentials.yaml")
+        assert "k8s_tokens" in creds
+        tokens = creds["k8s_tokens"]
+        assert "pl-01-monitoring" in tokens
+        assert "pl-01-pg" in tokens
+
+    def test_topology_k8s_tokens_match_cleanup_credentials(self):
+        # topology/credentials.yaml k8s_tokens must equal cleanup/*/credentials.yaml
+        # K8S_TOKEN — both are written from the same namespace credential source.
+        topo_creds = _load("topology/credentials.yaml")
+        namespaces = _load("topology/parameters.yaml")["environments"]["cluster-01/pl-01"]["namespaces"]
+        for ns_name, ns_data in namespaces.items():
+            postfix = ns_data["deployPostfix"]
+            topo_token = topo_creds["k8s_tokens"][ns_name]
+            cleanup_token = _load(f"cleanup/{postfix}/credentials.yaml")["K8S_TOKEN"]
+            assert cleanup_token == topo_token, (
+                f"K8S_TOKEN for namespace '{ns_name}' differs between "
+                "topology/credentials.yaml and cleanup/{postfix}/credentials.yaml"
+            )
