@@ -87,6 +87,13 @@ class TestCustomParamsWiring(BaseTest):
 
     Python-level contract: _build_cli_cmd appends --custom-params=<shlex-quoted value>
     when CUSTOM_PARAMS env var is set.
+
+    Note — UC-ES-RUN-1 (runtime/parameters.yaml from technicalConfigurationParameters)
+    and UC-ES-RUN-2 (runtime/credentials.yaml with custom-params runtime section):
+    both run entirely inside the Java Calculator — Python only forwards --custom-params
+    to the CLI (covered by test_custom_params_value_is_shell_quoted below).
+    End-to-end verification lives in CmdbCliTest.java (build_effective_set_generator/
+    effective-set-generator/src/test/java/.../CmdbCliTest.java).
     """
 
     CUSTOM_PARAMS_JSON = '{"deployment":{"CUSTOM_ROUTING_ENABLED":"true","CUSTOM_RESOURCE_LIMIT":"512Mi"}}'
