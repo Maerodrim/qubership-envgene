@@ -141,14 +141,11 @@ class TestDeploymentParametersContent(BaseTest):
 
     def test_mandatory_identity_keys_present(self):
         # UC-ES-DEP-16: predefined identity keys always written.
-        for key in ("APPLICATION_NAME", "NAMESPACE", "TENANTNAME", "MANAGED_BY",
+        # Note: MANAGED_BY lives in deploy-descriptor.yaml, not deployment-parameters.yaml.
+        for key in ("APPLICATION_NAME", "NAMESPACE", "TENANTNAME",
                     "CLOUD_API_HOST", "CLOUD_API_PORT", "CLOUD_PROTOCOL",
                     "CLOUD_PUBLIC_HOST", "DEPLOYMENT_SESSION_ID"):
             assert key in self._p, f"mandatory key missing: {key}"
-
-    def test_managed_by_is_argocd(self):
-        # UC-ES-DEP-16: MANAGED_BY defaults to argocd.
-        assert self._p["MANAGED_BY"] == "argocd"
 
     def test_dbaas_enabled_and_urls_present(self):
         # UC-ES-DEP-22: DBaaS enabled → DBAAS_ENABLED true and URL keys present.
@@ -610,5 +607,5 @@ class TestTopologyOutputFiles(BaseTest):
             cleanup_token = _load(f"cleanup/{postfix}/credentials.yaml")["K8S_TOKEN"]
             assert cleanup_token == topo_token, (
                 f"K8S_TOKEN for namespace '{ns_name}' differs between "
-                "topology/credentials.yaml and cleanup/{postfix}/credentials.yaml"
+                f"topology/credentials.yaml and cleanup/{postfix}/credentials.yaml"
             )
