@@ -390,3 +390,83 @@ class TestHandleEffectiveSetConfigAppChart(BaseTest):
     def test_invalid_json_raises_json_decode_error(self):
         with pytest.raises(json.JSONDecodeError):
             handle_effective_set_config("not-json-{")
+
+
+# ---------------------------------------------------------------------------
+# UC-ES-PIPE-4/5/6/7: handle_effective_set_config consumer schema wiring
+# ---------------------------------------------------------------------------
+
+class TestHandleEffectiveSetConfigConsumers(BaseTest):
+    """
+    UC-ES-PIPE-4/5/6/7 — handle_effective_set_config writes each consumer
+    schema to a temp file and appends one --pipeline-consumer-specific-schema-path
+    flag per consumer to extra_args.  The flag is the Python-level contract that
+    makes UC-ES-PIPE-4..7 possible; the actual pipeline/consumer-*.yaml files
+    are written by the Java Calculator.
+
+    Note — UC-ES-PIPE-1 (pipeline/parameters.yaml and pipeline/credentials.yaml
+    from Cloud e2eParameters), UC-ES-PIPE-4..7 output file content (consumer
+    parameters/credentials split, schema defaults, mandatory-key failure): all
+    run entirely inside the Java Calculator (CliParameterParser.createPipelineFiles).
+    End-to-end verification lives in CmdbCliTest.java (build_effective_set_generator/
+    effective-set-generator/src/test/java/.../CmdbCliTest.java).
+    """
+
+    _SCHEMA = {
+        "$schema": "http://json-schema.org/draft-07/schema",
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "version": {"type": "integer"},
+        },
+        "required": ["name", "version"],
+    }
+
+    def _config(self, consumers):
+        return json.dumps({"contexts": {"pipeline": {"consumers": consumers}}})
+
+    def test_consumer_with_inline_schema_adds_pcssp_flag(self):
+        # UC-ES-PIPE-4: consumer with inline schema → one --pipeline-consumer-specific-schema-path
+        # flag appended to extra_args so the Java CLI knows where to find the schema.
+        config = self._config([{"name": "consumer-v1.0", "version": "v1.0", "schema": self._SCHEMA}])
+        result = handle_effective_set_config(config)
+        pcssp_flags = [f for f in result["extra_args"] if "--pipeline-consumer-specific-schema-path=" in f]
+        assert len(pcssp_flags) == 1
+
+    def test_consumer_schema_written_to_disk(self):
+        # UC-ES-PIPE-4: inline schema is persisted so the Java CLI can read it by path.
+        config = self._config([{"name": "myapp", "version": "v2.0", "schema": self._SCHEMA}])
+        result = handle_effective_set_config(config)
+        pcssp = next(f for f in result["extra_args"] if "--pipeline-consumer-specific-schema-path=" in f)
+        schema_path = pcssp.split("=", 1)[1]
+        assert Path(schema_path).is_file(), f"schema file must exist on disk: {schema_path}"
+
+    def test_schema_filename_uses_name_and_version(self):
+        # UC-ES-PIPE-4: filename = "{name}-{version}.schema.json" (consumed by Java CLI
+        # to derive the consumer output file prefix).
+        config = self._config([{"name": "consumer-v1.0", "version": "v1.0", "schema": self._SCHEMA}])
+        result = handle_effective_set_config(config)
+        pcssp = next(f for f in result["extra_args"] if "--pipeline-consumer-specific-schema-path=" in f)
+        assert pcssp.endswith("consumer-v1.0-v1.0.schema.json")
+
+    def test_multiple_consumers_produce_multiple_pcssp_flags(self):
+        # UC-ES-PIPE-4: two consumers → two separate --pipeline-consumer-specific-schema-path flags.
+        config = self._config([
+            {"name": "app-a", "version": "v1", "schema": self._SCHEMA},
+            {"name": "app-b", "version": "v2", "schema": self._SCHEMA},
+        ])
+        result = handle_effective_set_config(config)
+        pcssp_flags = [f for f in result["extra_args"] if "--pipeline-consumer-specific-schema-path=" in f]
+        assert len(pcssp_flags) == 2
+
+    def test_no_consumers_produces_no_pcssp_flag(self):
+        # UC-ES-PIPE-4: empty consumers list → no --pipeline-consumer-specific-schema-path in CLI.
+        result = handle_effective_set_config('{"contexts": {"pipeline": {"consumers": []}}}')
+        assert not any("pipeline-consumer-specific-schema-path" in f for f in result["extra_args"])
+
+    def test_consumer_missing_name_or_version_is_skipped(self):
+        # UC-ES-PIPE-7 precondition: consumer entry without name/version is skipped —
+        # no pcssp flag emitted, no exception raised.
+        config = self._config([{"schema": self._SCHEMA}])
+        result = handle_effective_set_config(config)
+        assert not any("pipeline-consumer-specific-schema-path" in f for f in result["extra_args"])
