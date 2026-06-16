@@ -512,4 +512,3 @@ class TestHandleEffectiveSetConfigAppChart(BaseTest):
     def test_invalid_json_raises_json_decode_error(self):
         with pytest.raises(json.JSONDecodeError):
             handle_effective_set_config("not-json-{")
-
