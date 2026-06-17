@@ -8,17 +8,20 @@ UC-AD-ERR-3  Artifact URL not found — process_env_template raises ValueError w
 UC-AD-ERR-4  Missing ArtDef — process_env_template raises FileNotFoundError when
              configuration/artifact_definitions/{app_name}.yml/.yaml is absent.
 
-These are integration-level tests: they call the real process_env_template()
-function with real filesystem fixtures and mocked HTTP responses (aioresponses +
-responses libraries).  No production logic is reimplemented.
+Integration pattern: real project directory structure is written to disk via
+yaml.dump, process_env_template() is called with no mocking of production logic.
+HTTP is mocked at the network boundary only (aioresponses + responses) to simulate
+registry 404 responses without real network access.
 """
 import os
+import shutil
 import sys
 from os import environ
 from pathlib import Path
 
 import pytest
 import responses
+import yaml
 from aioresponses import aioresponses
 
 from scripts.build_env.tests.base_test import BaseTest
@@ -59,65 +62,50 @@ ARTIFACT_NAME = f"{ARTIFACT_ID}-{VERSION}"
 DD_URL = f"{SNAPSHOT_BASE}/{BASE_PATH}/{ARTIFACT_NAME}.json"
 ZIP_URL = f"{SNAPSHOT_BASE}/{BASE_PATH}/{ARTIFACT_NAME}.zip"
 
+APP_NAME = "deployment-configuration-env-templates"
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-_ARTDEF_CONTENT = f"""\
-name: "deployment-configuration-env-templates"
-groupId: "{GROUP_ID}"
-artifactId: "{ARTIFACT_ID}"
-registry:
-  name: "artifactory"
-  mavenConfig:
-    repositoryDomainName: "https://artifactory.qubership.org"
-    targetSnapshot: "mvn.snapshot"
-    targetStaging: "mvn.staging"
-    targetRelease: "mvn.release"
-"""
-
-_ENV_DEFINITION_CONTENT = f"""\
-envTemplate:
-  artifact: "deployment-configuration-env-templates:{VERSION}"
-"""
-
-_CREDENTIALS_CONTENT = """\
-dummy-cred:
-  type: usernamePassword
-  data:
-    username: "ci-bot"
-    password: "s3cr3t"
-"""
-
-_CONFIG_CONTENT = "crypt: false\n"
-
-
-def _write(path: Path, content: str) -> None:
+def _write_yaml(path: Path, content: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
+    path.write_text(yaml.dump(content, default_flow_style=False, allow_unicode=True))
 
 
 def _setup_project(project_dir: Path, *, include_artdef: bool = True) -> None:
     """Create minimal project directory structure for process_env_template()."""
-    # Configuration
-    _write(project_dir / "configuration" / "config.yml", _CONFIG_CONTENT)
-    _write(
-        project_dir / "configuration" / "credentials" / "credentials.yml",
-        _CREDENTIALS_CONTENT,
-    )
+    _write_yaml(project_dir / "configuration" / "config.yml",
+                {"crypt": False})
+
+    _write_yaml(project_dir / "configuration" / "credentials" / "credentials.yml",
+                {"dummy-cred": {"type": "usernamePassword",
+                                "data": {"username": "ci-bot", "password": "s3cr3t"}}})
+
     if include_artdef:
-        _write(
-            project_dir / "configuration" / "artifact_definitions" / "deployment-configuration-env-templates.yml",
-            _ARTDEF_CONTENT,
+        _write_yaml(
+            project_dir / "configuration" / "artifact_definitions" / f"{APP_NAME}.yml",
+            {
+                "name": APP_NAME,
+                "groupId": GROUP_ID,
+                "artifactId": ARTIFACT_ID,
+                "registry": {
+                    "name": "artifactory",
+                    "mavenConfig": {
+                        "repositoryDomainName": "https://artifactory.qubership.org",
+                        "targetSnapshot": "mvn.snapshot",
+                        "targetStaging": "mvn.staging",
+                        "targetRelease": "mvn.release",
+                    },
+                },
+            },
         )
 
-    # Env definition
-    _write(
+    _write_yaml(
         project_dir / "environments" / CLUSTER / ENV_NAME / "Inventory" / "env_definition.yml",
-        _ENV_DEFINITION_CONTENT,
+        {"envTemplate": {"artifact": f"{APP_NAME}:{VERSION}"}},
     )
 
-    # Tmp dir — process_env_template writes the downloaded template here.
     (project_dir / "tmp").mkdir(parents=True, exist_ok=True)
 
 
@@ -151,40 +139,35 @@ class TestMissingArtDef(BaseTest):
         environ.pop("FULL_ENV_NAME", None)
 
     def test_missing_artdef_raises_file_not_found(self):
-        # ArtDef file is absent — FileNotFoundError must be raised before HTTP calls.
-        with pytest.raises(FileNotFoundError, match="deployment-configuration-env-templates"):
+        with pytest.raises(FileNotFoundError, match=APP_NAME):
             process_env_template()
 
     def test_missing_artdef_no_network_call_needed(self):
-        # The error must be raised before any network activity — verify by not
-        # registering any mocked HTTP routes (unmocked calls raise ConnectionError).
+        # Error must be raised before any network activity — no HTTP routes registered,
+        # so any real network call would raise ConnectionError instead.
         with pytest.raises(FileNotFoundError):
             process_env_template()
 
     def test_missing_artdef_error_contains_app_name(self):
-        # Error message must identify which application's ArtDef is missing.
         with pytest.raises(FileNotFoundError) as exc_info:
             process_env_template()
-        msg = str(exc_info.value)
-        assert "deployment-configuration-env-templates" in msg
+        assert APP_NAME in str(exc_info.value)
 
     def test_artdef_dir_missing_entirely_raises_file_not_found(self):
-        # artifact_definitions/ directory is absent entirely, not just the file.
         artdef_dir = self.feature_dir / "configuration" / "artifact_definitions"
         if artdef_dir.exists():
-            import shutil
             shutil.rmtree(artdef_dir)
 
         with pytest.raises(FileNotFoundError):
             process_env_template()
 
     def test_other_artdef_present_does_not_help(self):
-        # Another ArtDef exists but not the one needed — still FileNotFoundError.
-        _write(
+        _write_yaml(
             self.feature_dir / "configuration" / "artifact_definitions" / "other-template.yml",
-            "name: other-template\ngroupId: g\nartifactId: a\nregistry:\n  name: r\n",
+            {"name": "other-template", "groupId": "g", "artifactId": "a",
+             "registry": {"name": "r"}},
         )
-        with pytest.raises(FileNotFoundError, match="deployment-configuration-env-templates"):
+        with pytest.raises(FileNotFoundError, match=APP_NAME):
             process_env_template()
 
 
@@ -198,8 +181,8 @@ class TestArtifactUrlNotFound(BaseTest):
     descriptor (DD) and the ZIP artifact, check_artifact_async returns None,
     and validate_url raises ValueError with the artifact coordinates.
 
-    Tests run with ArtDef present (ERR-4 already resolved) and all HTTP routes
-    returning 404 to simulate a registry that does not contain the requested version.
+    HTTP is mocked at the network boundary only (aioresponses for async calls,
+    @responses.activate to block any unexpected sync HTTP).
     """
 
     FEATURE_TEST_DIR = "test_env_template_err3"
@@ -220,9 +203,13 @@ class TestArtifactUrlNotFound(BaseTest):
         environ.pop("ENVIRONMENT_NAME", None)
         environ.pop("FULL_ENV_NAME", None)
 
+    @pytest.fixture
+    def mock_aio_response(self):
+        with aioresponses() as m:
+            yield m
+
     @responses.activate
     def test_dd_and_zip_not_found_raises_value_error(self, mock_aio_response):
-        # Both DD and ZIP metadata return 404 → validate_url raises ValueError.
         mock_aio_response.get(METADATA_URL, status=404)
         mock_aio_response.head(DD_URL, status=404)
         mock_aio_response.head(ZIP_URL, status=404)
@@ -232,8 +219,6 @@ class TestArtifactUrlNotFound(BaseTest):
 
     @responses.activate
     def test_error_message_contains_artifact_coordinates(self, mock_aio_response):
-        # ValueError message must contain group_id, artifact_id, version so
-        # operators can locate the artifact in the registry.
         mock_aio_response.get(METADATA_URL, status=404)
         mock_aio_response.head(DD_URL, status=404)
         mock_aio_response.head(ZIP_URL, status=404)
@@ -242,8 +227,3 @@ class TestArtifactUrlNotFound(BaseTest):
             process_env_template()
         msg = str(exc_info.value)
         assert GROUP_ID in msg or ARTIFACT_ID in msg or VERSION in msg
-
-    @pytest.fixture
-    def mock_aio_response(self):
-        with aioresponses() as m:
-            yield m
