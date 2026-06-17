@@ -23,7 +23,13 @@ run_pytest_suite envgenehelper python/envgene/envgenehelper
 run_pytest_suite pipegene build_pipegene/scripts
 run_pytest_suite artifact_searcher python/artifact-searcher/artifact_searcher
 run_pytest_suite bg_manage scripts/bg_manage
-run_pytest_suite build_env scripts/build_env
+run_pytest_suite build_env_sd               scripts/build_env/tests/sd
+run_pytest_suite build_env_env_template     scripts/build_env/tests/env-template
+run_pytest_suite build_env_env_build        scripts/build_env/tests/env-build
+run_pytest_suite build_env_app_reg_defs     scripts/build_env/tests/app_reg_defs
+run_pytest_suite build_env_namespace_filter scripts/build_env/tests/namespace_filter
+run_pytest_suite build_env_inventory        scripts/build_env/tests/env_inventory_generation
 run_pytest_suite cred_rotation creds_rotation/scripts
+run_pytest_suite build_effective_set_generator build_effective_set_generator/scripts
 
 junitparser merge junit_*.xml junit.xml
