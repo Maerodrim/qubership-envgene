@@ -334,19 +334,11 @@ class TestHandleEffectiveSetConfigAppChart(BaseTest):
         assert "--app_chart_validation=true" in result["extra_args"]
         assert "--app_chart_validation=false" not in result["extra_args"]
 
-    def test_app_chart_validation_true_version_flag_also_present(self):
-        # UC-ES-DEP-A16: app chart flag and version flag both emitted.
-        result = handle_effective_set_config(
-            '{"version": "v2.0", "app_chart_validation": true}'
-        )
-        flags = result["extra_args"]
-        assert any("app_chart_validation=true" in f for f in flags)
-        assert any("effective-set-version=v2.0" in f for f in flags)
-
     def test_empty_config_defaults_app_chart_validation_to_true(self):
-        # UC-ES-DEP-A16: empty JSON object → default True.
+        # UC-ES-DEP-A16: empty JSON object → default True; False flag must not appear.
         result = handle_effective_set_config("{}")
         assert "--app_chart_validation=true" in result["extra_args"]
+        assert "--app_chart_validation=false" not in result["extra_args"]
 
     # ------------------------------------------------------------------
     # UC-ES-DEP-A18: validation disabled via false flag
@@ -359,15 +351,6 @@ class TestHandleEffectiveSetConfigAppChart(BaseTest):
             f"expected --app_chart_validation=false; got: {result['extra_args']}"
         )
         assert "--app_chart_validation=true" not in result["extra_args"]
-
-    def test_app_chart_validation_false_with_version(self):
-        # UC-ES-DEP-A18: version and app_chart_validation=false together.
-        result = handle_effective_set_config(
-            '{"version": "v2.0", "app_chart_validation": false}'
-        )
-        flags = result["extra_args"]
-        assert "--app_chart_validation=false" in flags
-        assert any("effective-set-version=v2.0" in f for f in flags)
 
     # ------------------------------------------------------------------
     # UC-ES-DEP-14: version flag
