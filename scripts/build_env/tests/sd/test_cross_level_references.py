@@ -18,8 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-import envgenehelper as helper
-import logger
+import envgenehelper as helper,logger
 import yaml
 
 from scripts.build_env.tests.base_test import BaseTest
