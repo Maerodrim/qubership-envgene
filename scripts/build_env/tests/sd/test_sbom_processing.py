@@ -4,8 +4,9 @@ import shutil
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError
-from envgenehelper import logger
+
 import pytest
+from envgenehelper import logger
 
 from scripts.build_env.tests.base_test import BaseTest
 
@@ -250,6 +251,7 @@ class TestFullGenerationLifecycle(BaseTest):
         # _run_full_generation must propagate CalledProcessError.
         def _fail(cmd, shell=True, check=True):
             raise CalledProcessError(1, cmd)
+
         logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-16A")
         monkeypatch.setattr(_ese, "_build_cli_cmd", lambda *a, **kw: "fake_cmd")
         monkeypatch.setattr(_ese.subprocess, "run", _fail)

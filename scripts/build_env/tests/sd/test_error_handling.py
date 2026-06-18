@@ -34,6 +34,7 @@ if str(_BUILD_ENV) not in sys.path:
 
 from envgenehelper.plugin_engine import PluginEngine
 import process_sd
+import envgenehelper as logger
 from process_sd import get_appdef_for_app
 
 FEATURE_TEST_DIR = "test_error_handling"
@@ -70,7 +71,7 @@ class TestMissingAppDef(BaseTest):
         # AppDefs/ does not exist at all → FileNotFoundError from identify_yaml_extension.
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError):
                 get_appdef_for_app("my-app:1.0.0", "my-app", plugins)
 
@@ -80,7 +81,7 @@ class TestMissingAppDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError):
                 get_appdef_for_app("missing-app:2.0.0", "missing-app", plugins)
 
@@ -91,7 +92,7 @@ class TestMissingAppDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError) as exc_info:
                 get_appdef_for_app("my-service:3.1.0", "my-service", plugins)
         assert "my-service" in str(exc_info.value)
@@ -102,7 +103,7 @@ class TestMissingAppDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError):
                 get_appdef_for_app("missing-app:1.0.0", "missing-app", plugins)
 
@@ -135,11 +136,12 @@ class TestMissingRegDef(BaseTest):
 
     def test_missing_regdef_directory_raises_file_not_found(self):
         # AppDef present, RegDefs/ directory absent entirely.
+        logger.info(f"Starting SD test:\n\tTest case: UC-AD-ERR-2")
         self._make_appdef("my-app", "nexus-registry")
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError):
                 get_appdef_for_app("my-app:1.0.0", "my-app", plugins)
 
@@ -150,7 +152,7 @@ class TestMissingRegDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError):
                 get_appdef_for_app("my-app:1.0.0", "my-app", plugins)
 
@@ -164,7 +166,7 @@ class TestMissingRegDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError):
                 get_appdef_for_app("my-app:1.0.0", "my-app", plugins)
 
@@ -175,7 +177,7 @@ class TestMissingRegDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError) as exc_info:
                 get_appdef_for_app("my-app:1.0.0", "my-app", plugins)
         assert "nexus-registry" in str(exc_info.value)
@@ -189,7 +191,7 @@ class TestMissingRegDef(BaseTest):
         # RegDef absent → FileNotFoundError (proves AppDef was found and parsed).
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(FileNotFoundError) as exc_info:
                 get_appdef_for_app("yaml-app:1.0.0", "yaml-app", plugins)
         # The error must be about the registry, not the app — proves AppDef resolved.
@@ -214,7 +216,7 @@ class TestMissingRegDef(BaseTest):
 
         plugins = _no_op_plugins(self.feature_dir)
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             app_def = get_appdef_for_app("my-app:1.0.0", "my-app", plugins)
         assert isinstance(app_def, Application)
         assert app_def.name == "my-app"

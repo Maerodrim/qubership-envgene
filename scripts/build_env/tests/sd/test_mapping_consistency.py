@@ -13,6 +13,7 @@ if str(_ESE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_ESE_SCRIPTS))
 
 import effective_set_entrypoint as _ese
+import envgenehelper as logger
 from effective_set_entrypoint import _run_forward_merge, _run_reverse_merge
 from envgenehelper.effective_set_helper import ES_MAPPING_FILE, ESGenerationContext
 from envgenehelper.yaml_helper import openYaml
@@ -80,6 +81,7 @@ class TestMappingConsistencyOnReverseMerge(BaseTest):
         # "pl-01-pg" removed from deployment, runtime, and cleanup mapping.yaml;
         # "pl-01-monitoring" preserved in all three.
         # Key matching is substring-based: deployPostfix "pg" ⊂ "pl-01-pg".
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-RUN-3 / UC-ES-CLN-3")
         es_dir = _es_dir(self.feature_dir)
         _write_all_mappings(es_dir, {
             "pl-01-pg": "/environments/cluster-01/pl-01/effective-set/deployment/pg",
@@ -176,6 +178,7 @@ class TestMappingConsistencyOnForwardMerge(BaseTest):
         # - old entry (pre-existing namespace, not in current delta SD) is preserved.
         # - new entry (written by Java CLI for the delta namespace) is added.
         # Both keys appear in deployment, runtime, and cleanup mapping.yaml.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-A14 / UC-ES-RUN-3 / UC-ES-CLN-3")
         OLD = {"pl-01-old": "/environments/cluster-01/pl-01/effective-set/deployment/old"}
         NEW = {"pl-01-new": "/environments/cluster-01/pl-01/effective-set/deployment/new"}
 

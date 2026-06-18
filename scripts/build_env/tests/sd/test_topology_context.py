@@ -33,9 +33,10 @@ import os
 import sys
 from pathlib import Path
 
+import envgenehelper as helper
+import logger
 import yaml
 
-import envgenehelper as helper
 from scripts.build_env.tests.base_test import BaseTest
 
 os.environ.setdefault("ENVIRONMENT_NAME", "env-01")
@@ -78,6 +79,7 @@ class TestClusterUrlParsing(BaseTest):
 
     def test_hostname_extracted_as_api_url(self):
         # cloud_api_url = urlsplit(clusterUrl).hostname
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-TOP-2")
         assert urlsplit_filter(self._url, "hostname") == "api.cl-03.managed.qubership.cloud"
 
     def test_port_extracted_as_api_port(self):
@@ -116,6 +118,7 @@ class TestClusterUrlVariants(BaseTest):
 
     def test_nonstandard_port_extracted_correctly(self):
         # Scenario port: port 8443 is preserved verbatim.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-TOP-3")
         url = self._url("https://API.cl-03.managed.qubership.cloud:8443")
         assert urlsplit_filter(url, "port") == 8443
         assert urlsplit_filter(url, "hostname") == "api.cl-03.managed.qubership.cloud"

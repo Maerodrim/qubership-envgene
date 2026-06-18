@@ -16,8 +16,8 @@ import sys
 import time
 from pathlib import Path
 
-import yaml
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from scripts.build_env.tests.base_test import BaseTest

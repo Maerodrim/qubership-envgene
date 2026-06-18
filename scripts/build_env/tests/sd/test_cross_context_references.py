@@ -31,9 +31,10 @@ import os
 import sys
 from pathlib import Path
 
+import envgenehelper as helper
+import logger
 import yaml
 
-import envgenehelper as helper
 from scripts.build_env.tests.base_test import BaseTest
 
 os.environ.setdefault("ENVIRONMENT_NAME", "env-01")
@@ -64,6 +65,7 @@ class TestCrossContextReferences(BaseTest):
     """
     UC-CC-CR-3..6 — cross-parameter-type references within the same Namespace.
     """
+    logger.info(f"Starting SD test:\n\tTest case: UC-CC-CR-3..6")
 
     def setup_method(self):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR

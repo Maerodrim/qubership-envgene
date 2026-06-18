@@ -13,9 +13,10 @@ import os
 import sys
 from pathlib import Path
 
+import envgenehelper as helper
+import logger
 import yaml
 
-import envgenehelper as helper
 from scripts.build_env.tests.base_test import BaseTest
 
 os.environ.setdefault("ENVIRONMENT_NAME", "env-01")
@@ -69,6 +70,7 @@ class TestMacroSimpleTypeResolution(BaseTest):
         return t, c
 
     def test_boolean_false_context_value_becomes_string(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-CC-MR-1")
         t, c = self._files("bool_false", {"debug": "{{ debug_flag }}"}, {"debug_flag": False})
         result = _render_from_files(t, c)
         assert result["debug"] == "False"
@@ -148,6 +150,7 @@ class TestMacroComplexStructureResolution(BaseTest):
         return t, c
 
     def test_nested_dict_template_all_leaf_macros_resolved(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-CC-MR-2")
         t, c = self._files(
             "nested",
             {"connection": {"host": "{{ db_host }}", "port": "{{ db_port }}", "ssl": "{{ db_ssl }}"}},

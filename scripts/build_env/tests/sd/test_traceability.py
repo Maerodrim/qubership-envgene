@@ -1,9 +1,9 @@
-import json
 import os
 import sys
 from pathlib import Path
 
 import pytest
+from envgenehelper import logger
 
 from scripts.build_env.tests.base_test import BaseTest
 
@@ -18,11 +18,11 @@ from build_effective_set_generator.scripts.handle_effective_set_config import ha
 from effective_set_entrypoint import _build_cli_cmd
 
 _FIXTURES = (
-    Path(__file__).resolve().parents[4]
-    / "build_effective_set_generator"
-    / "effective-set-generator"
-    / "src" / "test" / "resources"
-    / "environments" / "cluster-01" / "pl-01" / "effective-set"
+        Path(__file__).resolve().parents[4]
+        / "build_effective_set_generator"
+        / "effective-set-generator"
+        / "src" / "test" / "resources"
+        / "environments" / "cluster-01" / "pl-01" / "effective-set"
 )
 
 FEATURE_TEST_DIR = "test_traceability"
@@ -58,6 +58,7 @@ class TestTraceabilityFlagHandleConfig(BaseTest):
 
     def test_enable_traceability_true_emits_true_flag(self):
         # UC-ES-TR-1: explicit true → --enable-traceability=true in extra_args.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-TR-1 / UC-ES-TR-2")
         result = handle_effective_set_config('{"enable_traceability": true}')
         assert "--enable-traceability=true" in result["extra_args"]
         assert "--enable-traceability=false" not in result["extra_args"]
@@ -174,6 +175,7 @@ class TestMappingYamlNoComments(BaseTest):
     ])
     def test_mapping_yaml_has_no_comment_lines(self, rel_path):
         # UC-ES-TR-5: no line in any mapping.yaml begins with '#'.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-TR-5")
         for line in _fixture_text(rel_path).splitlines():
             stripped = line.strip()
             if stripped:

@@ -3,10 +3,10 @@ import shutil
 from pathlib import Path
 
 import pytest
-
-from envgenehelper import validate_parameters
+from envgenehelper import validate_parameters, logger
 from envgenehelper.creds_helper import validate_creds
 from envgenehelper.errors import ValidationError
+
 from scripts.build_env.tests.base_test import BaseTest
 
 FEATURE_TEST_DIR = "test_null_value_validation"
@@ -42,6 +42,7 @@ class TestNullValueValidationParameters(BaseTest):
 
     def test_all_parameters_resolved_passes(self, caplog):
         # UC-NVV-3: no envgeneNullValue anywhere — validation must pass and log completion.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-A14 / UC-ES-RUN-3 / UC-ES-CLN-3")
         env_dir = self._prepare("TC-NVV-3-params")
         _write(env_dir / "tenant.yml",
                "name: test-tenant\ndeployParameters:\n  API_URL: https://real.host\n")

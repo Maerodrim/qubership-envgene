@@ -380,7 +380,8 @@ class TestRegistryV2ResolveAuth(BaseTest):
         self.feature_dir = self.output_dir / FEATURE_TEST_DIR / "registry_v2_auth"
         self.feature_dir.mkdir(parents=True, exist_ok=True)
 
-    def _make_v2_registry(self, provider: str, auth_method: str, credentials_id: str = "", name: str = "my-nexus-v2") -> RegistryV2:
+    def _make_v2_registry(self, provider: str, auth_method: str, credentials_id: str = "",
+                          name: str = "my-nexus-v2") -> RegistryV2:
         auth_cfg = {"provider": provider, "authMethod": auth_method}
         if credentials_id:
             auth_cfg["credentialsId"] = credentials_id
@@ -422,7 +423,8 @@ class TestRegistryV2ResolveAuth(BaseTest):
 
     def test_missing_credential_in_env_creds_raises(self):
         # credentialsId references a credential that isn't in env_creds → ValueError.
-        reg = self._make_v2_registry("nexus", AUTH_METHOD_USER_PASS, credentials_id="nexus-creds", name="my-nexus-v2-miss")
+        reg = self._make_v2_registry("nexus", AUTH_METHOD_USER_PASS, credentials_id="nexus-creds",
+                                     name="my-nexus-v2-miss")
         with pytest.raises(ValueError, match="not found in decrypted credentials"):
             reg.resolve_auth({})
 
@@ -489,7 +491,7 @@ class TestSnapshotRejection(BaseTest):
         # but that is a different error — the SNAPSHOT guard itself is not triggered.
         import process_sd
         with patch.object(process_sd, "APP_DEFS_PATH", str(self.appdef_dir)), \
-             patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
+                patch.object(process_sd, "REG_DEFS_PATH", str(self.regdef_dir)):
             with pytest.raises(Exception) as exc_info:
                 download_sd_by_appver("my-app", "1.2.3", self._no_op_plugins())
         assert "SNAPSHOT" not in str(exc_info.value)
