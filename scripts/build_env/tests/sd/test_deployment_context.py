@@ -3,6 +3,8 @@ import shlex
 import sys
 from pathlib import Path
 
+from envgenehelper import logger
+
 from scripts.build_env.tests.base_test import BaseTest
 
 os.environ.setdefault("ENVIRONMENT_NAME", "env-01")
@@ -53,6 +55,7 @@ class TestDeploymentSessionId(BaseTest):
     def test_session_id_forwarded_to_cli_as_extra_param(self):
         # UC-ES-DEP-15: DEPLOYMENT_SESSION_ID env var → --extra_params=DEPLOYMENT_SESSION_ID=<uuid>
         # in the CLI command so the Java Calculator writes it into deployment-parameters.yaml.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-15")
         uuid = "550e8400-e29b-41d4-a716-446655440000"
         os.environ["DEPLOYMENT_SESSION_ID"] = uuid
         sd_path = self.feature_dir / "sd.yaml"
@@ -114,6 +117,7 @@ class TestCustomParamsWiring(BaseTest):
     def test_custom_params_value_is_shell_quoted(self):
         # UC-ES-DEP-A8: value is passed through shlex.quote so special chars are safe.
         # effective_set_entrypoint: cmd.append(f"--custom-params={shlex.quote(custom_params)}")
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-A8")
         os.environ["CUSTOM_PARAMS"] = self.CUSTOM_PARAMS_JSON
         sd_path = self.feature_dir / "sd.yaml"
         _write(sd_path, "applications: []\n")

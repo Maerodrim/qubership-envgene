@@ -3,10 +3,11 @@ import logging
 import os
 from pathlib import Path
 
+from envgenehelper import logger
 import pytest
-
 from envgenehelper.env_helper import Environment
 from envgenehelper.test_helpers import TestHelpers
+
 from scripts.build_env.tests.base_test import BaseTest
 
 os.environ.setdefault("ENVIRONMENT_NAME", "env-01")
@@ -69,6 +70,7 @@ class TestHandleDeployPostfixPositive(BaseTest):
     def test_tc_dp_001_exact_match_postfix_replaced(self):
         # UC-CC-DP-1: deployPostfix "core-namespace" == namespace logical name → replaced
         # with folder name "core". userData removed because only useDeployPostfixAsNamespace present.
+        logger.info(f"Starting SD test:\n\tTest case: UC-CC-DP-1..2")
         env = self._prepare()
         _write_namespace(env, "core", "core-namespace")
         sd_data = _sd_json(
@@ -195,6 +197,7 @@ class TestHandleDeployPostfixNegative(BaseTest):
     def test_unknown_postfix_exits_with_code_1(self, caplog):
         # UC-CC-DP-3: deployPostfix "unknown-namespace" does not match any namespace
         # logical name → handle_sd must call exit(1).
+        logger.info(f"Starting SD test:\n\tTest case: UC-CC-DP-3 / UC-CC-DP-4")
         env = self._prepare()
         _write_namespace(env, "core", "core-namespace")
         sd_data = self._sd_data_with_postfix("unknown-namespace")

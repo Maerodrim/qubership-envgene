@@ -92,13 +92,53 @@ runs:
         cd ../..
         mv junit.xml junit_bg_manage.xml
 
-    - name: BUILD ENV test
+    - name: BUILD ENV SD test
       shell: bash
       run: |
         cd scripts/build_env
-        pytest --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        pytest tests/sd --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
         cd ../..
-        mv junit.xml junit_build_env.xml
+        mv junit.xml junit_build_env_sd.xml
+
+    - name: BUILD ENV ENV-TEMPLATE test
+      shell: bash
+      run: |
+        cd scripts/build_env
+        pytest tests/env-template --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        cd ../..
+        mv junit.xml junit_build_env_env_template.xml
+
+    - name: BUILD ENV ENV-BUILD test
+      shell: bash
+      run: |
+        cd scripts/build_env
+        pytest tests/env-build --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        cd ../..
+        mv junit.xml junit_build_env_env_build.xml
+
+    - name: BUILD ENV APP-REG-DEFS test
+      shell: bash
+      run: |
+        cd scripts/build_env
+        pytest tests/app_reg_defs --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        cd ../..
+        mv junit.xml junit_build_env_app_reg_defs.xml
+
+    - name: BUILD ENV NAMESPACE-FILTER test
+      shell: bash
+      run: |
+        cd scripts/build_env
+        pytest tests/namespace_filter --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        cd ../..
+        mv junit.xml junit_build_env_namespace_filter.xml
+
+    - name: BUILD ENV INVENTORY-GENERATION test
+      shell: bash
+      run: |
+        cd scripts/build_env
+        pytest tests/env_inventory_generation --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        cd ../..
+        mv junit.xml junit_build_env_inventory_generation.xml
 
     - name: BUILD CRED ROTATION test
       shell: bash
@@ -115,6 +155,14 @@ runs:
         pytest --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
         cd ../..
         mv junit.xml junit_build_envgene_scripts.xml
+
+    - name: BUILD EFFECTIVE SET GENERATOR test
+      shell: bash
+      run: |
+        cd build_effective_set_generator/scripts
+        pytest --capture=no -W ignore::DeprecationWarning --junitxml=../../junit.xml
+        cd ../..
+        mv junit.xml junit_build_effective_set_generator.xml
 
     - name: Merge test results
       shell: bash

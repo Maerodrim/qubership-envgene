@@ -15,6 +15,7 @@ import os
 import sys
 from pathlib import Path
 
+from envgenehelper import logger
 import pytest
 
 from scripts.build_env.tests.base_test import BaseTest
@@ -29,11 +30,11 @@ if str(_ESE_SCRIPTS) not in sys.path:
 from envgenehelper.yaml_helper import openYaml
 
 _FIXTURES = (
-    Path(__file__).resolve().parents[4]
-    / "build_effective_set_generator"
-    / "effective-set-generator"
-    / "src" / "test" / "resources"
-    / "environments" / "cluster-01" / "pl-01" / "effective-set"
+        Path(__file__).resolve().parents[4]
+        / "build_effective_set_generator"
+        / "effective-set-generator"
+        / "src" / "test" / "resources"
+        / "environments" / "cluster-01" / "pl-01" / "effective-set"
 )
 
 _SECURED_KEYS = {
@@ -66,6 +67,7 @@ class TestMappingKeyConsistency(BaseTest):
     def test_all_three_mapping_files_have_identical_key_sets(self):
         # UC-ES-DEP-A14 / RUN-3 / CLN-3: namespace keys in all three mapping files
         # must be exactly the same set.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-A14 / UC-ES-RUN-3 / UC-ES-CLN-3")
         dep = set(_load("deployment/mapping.yaml").keys())
         run = set(_load("runtime/mapping.yaml").keys())
         cln = set(_load("cleanup/mapping.yaml").keys())
@@ -332,11 +334,11 @@ class TestPerServiceParametersStructure(BaseTest):
     def test_per_service_parameters_dir_exists_for_monitoring(self):
         # UC-ES-DEP-A11: charted SBOM → per-service-parameters/{chart}/ created.
         assert (_FIXTURES / "deployment/monitoring-origin/MONITORING/values/"
-                "per-service-parameters").is_dir()
+                            "per-service-parameters").is_dir()
 
     def test_per_service_parameters_dir_exists_for_postgres(self):
         assert (_FIXTURES / "deployment/pg/postgres/values/"
-                "per-service-parameters").is_dir()
+                            "per-service-parameters").is_dir()
 
     def test_per_service_entries_have_required_keys(self):
         # UC-ES-DEP-A11: each service entry has SERVICE_NAME, DEPLOYMENT_VERSION,
