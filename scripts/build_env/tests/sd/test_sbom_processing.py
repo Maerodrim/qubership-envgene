@@ -4,7 +4,7 @@ import shutil
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError
-
+from envgenehelper import logger
 import pytest
 
 from scripts.build_env.tests.base_test import BaseTest
@@ -147,6 +147,7 @@ class TestBuildCliCmdSbomWiring(BaseTest):
     def test_sboms_path_included_when_sd_file_exists(self):
         # UC-ES-DEP-14: sd file present → --sboms-path forwarded to CLI so the
         # Java Calculator can read SBOM components (deploy_param, full_image_name).
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-14")
         sd_path = self.feature_dir / "sd.yaml"
         _write(sd_path, "applications: []\n")
         es_dir = self.feature_dir / "effective-set"
@@ -184,6 +185,7 @@ class TestBuildCliCmdSbomWiring(BaseTest):
     def test_app_chart_validation_true_in_cli_command(self):
         # UC-ES-DEP-A16: EFFECTIVE_SET_CONFIG with validation enabled →
         # --app_chart_validation=true is appended to the CLI command.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-16")
         os.environ["EFFECTIVE_SET_CONFIG"] = '{"app_chart_validation": true}'
         sd_path = self.feature_dir / "sd.yaml"
         _write(sd_path, "applications: []\n")
@@ -211,6 +213,7 @@ class TestBuildCliCmdSbomWiring(BaseTest):
         # UC-ES-DEP-A18: EFFECTIVE_SET_CONFIG with validation disabled →
         # --app_chart_validation=false is appended so the Java Calculator skips
         # app chart component presence checks.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-18")
         os.environ["EFFECTIVE_SET_CONFIG"] = '{"app_chart_validation": false}'
         sd_path = self.feature_dir / "sd.yaml"
         _write(sd_path, "applications: []\n")
@@ -247,7 +250,7 @@ class TestFullGenerationLifecycle(BaseTest):
         # _run_full_generation must propagate CalledProcessError.
         def _fail(cmd, shell=True, check=True):
             raise CalledProcessError(1, cmd)
-
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-DEP-16A")
         monkeypatch.setattr(_ese, "_build_cli_cmd", lambda *a, **kw: "fake_cmd")
         monkeypatch.setattr(_ese.subprocess, "run", _fail)
 
@@ -411,6 +414,7 @@ class TestHandleEffectiveSetConfigConsumers(BaseTest):
     def test_consumer_with_inline_schema_adds_pcssp_flag(self):
         # UC-ES-PIPE-4: consumer with inline schema → one --pipeline-consumer-specific-schema-path
         # flag appended to extra_args so the Java CLI knows where to find the schema.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-PIPE-4")
         config = self._config([{"name": "consumer-v1.0", "version": "v1.0", "schema": self._SCHEMA}])
         result = handle_effective_set_config(config)
         pcssp_flags = [f for f in result["extra_args"] if "--pipeline-consumer-specific-schema-path=" in f]
@@ -450,6 +454,7 @@ class TestHandleEffectiveSetConfigConsumers(BaseTest):
     def test_consumer_missing_name_or_version_is_skipped(self):
         # UC-ES-PIPE-7 precondition: consumer entry without name/version is skipped —
         # no pcssp flag emitted, no exception raised.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-PIPE-7")
         config = self._config([{"schema": self._SCHEMA}])
         result = handle_effective_set_config(config)
         assert not any("pipeline-consumer-specific-schema-path" in f for f in result["extra_args"])
@@ -485,6 +490,7 @@ class TestNoSbomMode(BaseTest):
 
     def test_no_sd_path_flag_when_sd_file_absent(self):
         # UC-ES-NOSBOM-1: absent sd file → --sd-path omitted from CLI command.
+        logger.info(f"Starting SD test:\n\tTest case: UC-ES-NOSBOM-1")
         sd_path = self.feature_dir / "nonexistent_sd.yaml"
         cmd = _build_cli_cmd(self.feature_dir / "es", "cluster-01/env-01", sd_path)
         assert "--sd-path" not in cmd

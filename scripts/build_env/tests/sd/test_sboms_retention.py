@@ -31,6 +31,7 @@ if str(_BUILD_ENV) not in sys.path:
 
 from build_effective_set_generator.scripts.sboms_retention_policy import sboms_retention_policy
 from envgenehelper.test_helpers import TestHelpers
+from envgenehelper import logger
 
 FEATURE_TEST_DIR = "test_handle_sboms"
 
@@ -81,6 +82,7 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_1_retention_disabled_files_untouched(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-SBOM-1")
         case_dir = self._prepare("TC-SBOM-1", {"sbom_retention": {"enabled": False}})
         app_a_dir = case_dir / "sboms" / "app-a"
         app_a_dir.mkdir(parents=True)
@@ -96,6 +98,7 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_2_all_apps_below_limit_nothing_pruned(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-SBOM-2")
         case_dir = self._prepare("TC-SBOM-2",
                                  {"sbom_retention": {"enabled": True, "keep_versions_per_app": 10}})
         now = time.time()
@@ -124,6 +127,7 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_3_excess_files_pruned_to_limit(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-SBOM-3")
         case_dir = self._prepare("TC-SBOM-3",
                                  {"sbom_retention": {"enabled": True, "keep_versions_per_app": 10}})
         now = time.time()
@@ -161,6 +165,7 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_4_strict_limit_keeps_3_newest(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-SBOM-4")
         case_dir = self._prepare("TC-SBOM-4",
                                  {"sbom_retention": {"enabled": True, "keep_versions_per_app": 3}})
         now = time.time()
@@ -181,6 +186,7 @@ class TestSbomRetention(BaseTest):
     # ------------------------------------------------------------------
 
     def test_uc_sbom_5_size_limit_trims_all_apps_to_one(self):
+        logger.info(f"Starting SD test:\n\tTest case: UC-SBOM-5")
         case_dir = self._prepare("TC-SBOM-5",
                                  {"sbom_retention": {"enabled": True, "keep_versions_per_app": 10}})
         now = time.time()
