@@ -34,7 +34,7 @@ if str(_BUILD_ENV) not in sys.path:
 
 from envgenehelper.plugin_engine import PluginEngine
 import process_sd
-import envgenehelper as logger
+from envgenehelper import logger
 from process_sd import get_appdef_for_app
 
 FEATURE_TEST_DIR = "test_error_handling"

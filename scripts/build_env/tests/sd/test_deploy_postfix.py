@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 
-import envgenehelper as logger
+from envgenehelper import logger
 import pytest
 from envgenehelper.env_helper import Environment
 from envgenehelper.test_helpers import TestHelpers

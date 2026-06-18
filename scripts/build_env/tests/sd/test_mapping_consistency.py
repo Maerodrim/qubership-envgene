@@ -13,7 +13,7 @@ if str(_ESE_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_ESE_SCRIPTS))
 
 import effective_set_entrypoint as _ese
-import envgenehelper as logger
+from envgenehelper import logger
 from effective_set_entrypoint import _run_forward_merge, _run_reverse_merge
 from envgenehelper.effective_set_helper import ES_MAPPING_FILE, ESGenerationContext
 from envgenehelper.yaml_helper import openYaml

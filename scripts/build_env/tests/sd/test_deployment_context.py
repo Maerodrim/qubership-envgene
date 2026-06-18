@@ -3,7 +3,7 @@ import shlex
 import sys
 from pathlib import Path
 
-import envgenehelper as logger
+from envgenehelper import logger
 
 from scripts.build_env.tests.base_test import BaseTest
 
