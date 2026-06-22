@@ -56,10 +56,8 @@ class EnvGeneWorkspace:
         scripts_root = str(Path(project_root) / "scripts")
         env["PYTHONPATH"] = f"{project_root}{os.pathsep}{python_root}{os.pathsep}{artifact_searcher}{os.pathsep}{integration}{os.pathsep}{jschon_sort}{os.pathsep}{scripts_root}"
 
-        # Find local .venv python if available
-        python_exe = str(Path(project_root) / ".venv" / "Scripts" / "python.exe")
-        if not os.path.exists(python_exe):
-            python_exe = "python"
+        import sys
+        python_exe = sys.executable
 
         result = subprocess.run(
             [python_exe, "-m", module_name],
@@ -71,6 +69,7 @@ class EnvGeneWorkspace:
 
         self.stdout = result.stdout
         self.stderr = result.stderr
+        self.returncode = result.returncode
         return result
 
     def run_pipeline(self, extra_env: dict = None):

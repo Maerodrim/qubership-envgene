@@ -16,12 +16,16 @@ def inv_exists(workspace):
 
 @when(parsers.parse('the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying "{action}" for "envDefinition"'))
 def pipeline_inv_content_envdef(workspace, action):
-    content = {
-        "envDefinition": {
-            "action": action,
-            "content": {"name": "test"} if action != "delete" else {}
+    env_def = {"action": action}
+    if action != "delete":
+        env_def["content"] = {
+            "inventory": {},
+            "envTemplate": {
+                "name": "test",
+                "artifact": "env-templates:1.0.0"
+            }
         }
-    }
+    content = {"envDefinition": env_def}
     if not hasattr(workspace, 'extra_env'):
         workspace.extra_env = {}
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
@@ -54,15 +58,15 @@ def target_paramset_not_exist(workspace, name, scope):
 
 @when(parsers.parse('the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying "{action}" for paramset "{name}" at "{scope}" scope'))
 def pipeline_inv_content_paramset(workspace, action, name, scope):
-    content = {
-        "paramSets": [
-            {
-                "action": action,
-                "place": scope,
-                "content": {"name": name, "params": {}} if action != "delete" else {"name": name}
-            }
-        ]
-    }
+    param_set = {"action": action, "place": scope}
+    if action != "delete":
+        param_set["content"] = {
+            "name": name,
+            "parameters": {}
+        }
+    else:
+        param_set["content"] = {"name": name}
+    content = {"paramSets": [param_set]}
     if not hasattr(workspace, 'extra_env'):
         workspace.extra_env = {}
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
@@ -97,16 +101,16 @@ def target_credentials_not_exist(workspace, name, scope):
 
 @when(parsers.parse('the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying "{action}" for credentials "{name}" at "{scope}" scope'))
 def pipeline_inv_content_creds(workspace, action, name, scope):
-    content = {
-        "credentials": [
-            {
-                "action": action,
-                "place": scope,
-                "name": name,
-                "content": {"user": "pass"} if action != "delete" else {}
+    cred = {"action": action, "place": scope, "name": name}
+    if action != "delete":
+        cred["content"] = {
+            "type": "usernamePassword",
+            "data": {
+                "username": "user",
+                "password": "password"
             }
-        ]
-    }
+        }
+    content = {"credentials": [cred]}
     if not hasattr(workspace, 'extra_env'):
         workspace.extra_env = {}
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
@@ -129,21 +133,27 @@ def pipeline_inv_content_fail(workspace):
     content = {
         "envDefinition": {
             "action": "create_or_replace",
-            "content": {"name": "test"}
+            "content": {
+                "inventory": {},
+                "envTemplate": {
+                    "name": "test",
+                    "artifact": "env-templates:1.0.0"
+                }
+            }
         },
         "paramSets": [
             {
                 "action": "invalid_action_to_fail",
                 "place": "env",
-                "content": {"name": "fail"}
+                "content": {"name": "fail", "parameters": {}}
             }
         ]
     }
     if not hasattr(workspace, 'extra_env'):
         workspace.extra_env = {}
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
-    # We expect this to fail, so we don't throw if returncode != 0
-    workspace.run_pipeline(extra_env=workspace.extra_env, check=False)
+    # We expect this to fail, but run_pipeline does not throw, so we don't need check=False
+    workspace.run_pipeline(extra_env=workspace.extra_env)
 
 @then('the pipeline fails')
 def pipeline_fails(workspace):

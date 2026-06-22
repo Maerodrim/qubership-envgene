@@ -24,7 +24,7 @@ def start_instance_pipeline(workspace):
 
 @then('the effective set is generated successfully')
 def effective_set_generated(workspace):
-    assert workspace.returncode == 0, "Pipeline failed to generate effective set"
+    assert workspace.returncode == 0, f"Pipeline failed to generate effective set. STDOUT: {workspace.stdout}\nSTDERR: {workspace.stderr}"
 
 @then('no SBOM files are deleted')
 def no_sbom_files_deleted(workspace):
