@@ -168,7 +168,7 @@ def resolve_path(env_dir: Path, place: Place, subdir: str, name: str, inventory:
     else:
         raise ValueError(place)
         
-    if inventory:
+    if inventory and place is Place.ENV:
         base = base / inventory
         
     return base / subdir / f"{name}.yml"
