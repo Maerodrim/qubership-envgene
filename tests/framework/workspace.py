@@ -18,10 +18,18 @@ class EnvGeneWorkspace:
         self.inventory_dir = self.base_dir / "inventory"
         self.regdefs_dir = self.base_dir / "regdefs"
         self.blueprints_dir = self.base_dir / "blueprints"
+        self.environments_dir = self.base_dir / "environments"
+        self.creds_dir = self.config_dir / "credentials"
 
         # Setup structure
-        for d in [self.config_dir, self.sboms_dir, self.inventory_dir, self.regdefs_dir, self.blueprints_dir]:
+        for d in [self.config_dir, self.creds_dir, self.sboms_dir, self.inventory_dir, self.regdefs_dir, self.blueprints_dir, self.environments_dir]:
             d.mkdir(parents=True, exist_ok=True)
+            
+        with open(self.creds_dir / "credentials.yml", "w") as f:
+            yaml.dump({}, f)
+
+        with open(self.config_dir / "registry.yml", "w") as f:
+            yaml.dump({}, f)
 
         # Execution State
         self.stdout = ""
@@ -42,7 +50,8 @@ class EnvGeneWorkspace:
         env = os.environ.copy()
         # Default E2E Variables
         env["CI_PROJECT_DIR"] = str(self.base_dir)
-        env["SECRET_KEY"] = "test-secret"
+        env["SECRET_KEY"] = "c2VjcmV0LWtleS1tdXN0LWJlLTMyLWJ5dGVzLWxvbmc="
+        env["EFFECTIVE_SET_CLI_PATH"] = "echo"
 
         if extra_env:
             env.update(extra_env)
@@ -79,7 +88,8 @@ class EnvGeneWorkspace:
             "ENV_NAMES": "test-cluster/test-env",
             "CLUSTER_NAME": "test-cluster",
             "ENVIRONMENT_NAME": "test-env",
-            "FULL_ENV_NAME": "test-cluster/test-env"
+            "FULL_ENV_NAME": "test-cluster/test-env",
+            "INSTANCES_DIR": str(self.environments_dir)
         }
         if extra_env:
             env.update(extra_env)

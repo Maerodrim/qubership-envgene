@@ -4,7 +4,7 @@ Feature: Environment Inventory Generation
   So that I can automate the setup of the environment configurations
 
   Background:
-    Given the pipeline has ENV_BUILDER set to "false"
+    Given the pipeline has ENV_BUILD set to "false"
 
   Scenario: UC-EINV-ED-1: Create env_definition.yml
     Given the target environment inventory file does not exist

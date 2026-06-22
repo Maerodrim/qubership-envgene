@@ -163,3 +163,10 @@ class DataBuilder:
 
         # We need to configure the workspace config to point to this directory
         self.workspace.config_data["env_templates_dir"] = str(td_dir).replace('\\', '/')
+
+    def create_artifact_def(self, app_name: str, content: dict):
+        """Creates an artifact definition file for the given app name."""
+        target_dir = self.workspace.config_dir / "artifact_definitions"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        with open(target_dir / f"{app_name}.yaml", "w") as f:
+            yaml.dump(content, f)

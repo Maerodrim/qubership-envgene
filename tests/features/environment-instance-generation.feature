@@ -5,7 +5,7 @@ Feature: Environment Instance Generation
 
   Background:
     Given an Environment Inventory exists for "test-cluster/test-env"
-    And the pipeline has ENV_BUILDER set to "true"
+    And the pipeline has ENV_BUILD set to "true"
 
   Scenario: UC-EIG-NF-1: Namespace NOT in BG Domain with deploy_postfix
     Given a template descriptor specifies namespace "core.yml.j2" with deploy_postfix "core"

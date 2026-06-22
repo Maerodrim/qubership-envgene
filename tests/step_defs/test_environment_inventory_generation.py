@@ -104,10 +104,12 @@ def pipeline_inv_content_creds(workspace, action, name, scope):
     cred = {"action": action, "place": scope, "name": name}
     if action != "delete":
         cred["content"] = {
-            "type": "usernamePassword",
-            "data": {
-                "username": "user",
-                "password": "password"
+            name: {
+                "type": "usernamePassword",
+                "data": {
+                    "username": "user",
+                    "password": "password"
+                }
             }
         }
     content = {"credentials": [cred]}
@@ -126,7 +128,7 @@ def creds_file_created(workspace, filename, scope):
     else:
         target = base_dir / "credentials"
         
-    assert (target / filename).exists(), f"Credentials file {filename} was not created at {scope} scope"
+    assert (target / filename).exists(), f"Credentials file {filename} was not created at {scope} scope.\nSTDOUT: {workspace.stdout}\nSTDERR: {workspace.stderr}"
 
 @when('the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying multiple operations where one fails')
 def pipeline_inv_content_fail(workspace):
