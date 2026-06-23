@@ -7,7 +7,7 @@ scenarios('../features/blue-green-deployment.feature')
 
 @given('Blue-Green state files are not created')
 def state_files_not_created(workspace):
-    pass # Managed by the isolated workspace
+    pass
 
 @given(parsers.parse('Blue-Green state files "{origin}" and "{peer}" exist'))
 def state_files_exist(workspace, origin, peer):
@@ -40,7 +40,6 @@ def trigger_pipeline(workspace, operation):
         "updateTime": "2026-06-22T00:00:00Z"
     }
 
-    # We must provide bg_domain.yml for bg_manage to validate the names
     bg_domain = {
         "controllerNamespace": {"name": "controller-ns"},
         "originNamespace": {"name": "origin-ns"},
@@ -67,7 +66,6 @@ def assert_state_files(workspace, origin, peer):
     assert origin in files, f"Expected {origin} to be created, found {files}\nSTDOUT: {workspace.stdout}\nSTDERR: {workspace.stderr}"
     assert peer in files, f"Expected {peer} to be created, found {files}\nSTDOUT: {workspace.stdout}\nSTDERR: {workspace.stderr}"
 
-    # Verify no other state files exist
     state_files = {f for f in files if "-active" in f or "-idle" in f or "-candidate" in f or "-legacy" in f}
     assert len(state_files) == 2, f"Expected exactly 2 state files, found {state_files}"
 
@@ -78,8 +76,6 @@ def assert_namespaces_same(workspace, first, second):
     first_dir = ns_dir / first
     second_dir = ns_dir / second
 
-    # The different_content generated a manifest.yaml in both namespaces with different content.
-    # We verify that they now have the exact same content (one was copied to the other).
     first_manifest = first_dir / "manifest.yaml"
     second_manifest = second_dir / "manifest.yaml"
 

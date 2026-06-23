@@ -89,7 +89,6 @@ def env_template_artifact(workspace, artifact):
 
 @then(parsers.parse('all namespaces are rendered using "{artifact}"'))
 def all_namespaces_rendered(workspace, artifact):
-    # Verify pipeline succeeded which implies rendering was successful
     assert workspace.returncode == 0, f"Pipeline failed with return code {workspace.returncode}"
 
 @given('SD_DATA is provided in the pipeline parameters')

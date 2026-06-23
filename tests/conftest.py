@@ -10,10 +10,8 @@ from tests.step_defs.common_steps import *
 
 @pytest.fixture(scope="session", autouse=True)
 def mock_nexus(tmp_path_factory):
-    """Starts a local HTTP server to mock Nexus."""
     base_dir = tmp_path_factory.mktemp("mock_nexus")
     
-    # Create test-artifact
     art_dir = base_dir / "release" / "org" / "test" / "test-artifact" / "v1"
     art_dir.mkdir(parents=True, exist_ok=True)
     with open(art_dir / "test-artifact-v1.json", "w") as f:
@@ -26,7 +24,6 @@ def mock_nexus(tmp_path_factory):
         z.writestr("templates/Cloud.yml.j2", "name: dummy-cloud\nnamespacePrefix: dummy\ndeployParameters: {}\ndeployParameterSets: []\ne2eParameters: {}\ne2eParameterSets: []\ntechnicalConfigurationParameters: {}\ntechnicalConfigurationParameterSets: []\napiUrl: dummy\napiPort: 80\ndashboardUrl: dummy\nlabels: []\ndefaultCredentialsId: dummy\nprotocol: dummy\nmaasConfig: {credentialsId: dummy}\nvaultConfig: {credentialsId: dummy}\nconsulConfig: {credentialsId: dummy, tokenSecret: dummy}\ndbaasConfigs: []\n")
         z.writestr("templates/Namespace.yml.j2", "name: dummy-namespace\nlabels: []\ndeployParameters: {}\ndeployParameterSets: []\ne2eParameters: {}\ne2eParameterSets: []\ntechnicalConfigurationParameters: {}\ntechnicalConfigurationParameterSets: []\nisServerSideMerge: false\ncleanInstallApprovalRequired: false\nmergeDeployParametersAndE2EParameters: false\ncredentialsId: dummy\n")
         
-    # Create foo artifact
     foo_dir = base_dir / "release" / "org" / "test" / "foo" / "1.0"
     foo_dir.mkdir(parents=True, exist_ok=True)
     with open(foo_dir / "foo-1.0.json", "w") as f:
@@ -39,7 +36,6 @@ def mock_nexus(tmp_path_factory):
         z.writestr("templates/Cloud.yml.j2", "name: dummy-cloud\nnamespacePrefix: dummy\ndeployParameters: {}\ndeployParameterSets: []\ne2eParameters: {}\ne2eParameterSets: []\ntechnicalConfigurationParameters: {}\ntechnicalConfigurationParameterSets: []\napiUrl: dummy\napiPort: 80\ndashboardUrl: dummy\nlabels: []\ndefaultCredentialsId: dummy\nprotocol: dummy\nmaasConfig: {credentialsId: dummy}\nvaultConfig: {credentialsId: dummy}\nconsulConfig: {credentialsId: dummy, tokenSecret: dummy}\ndbaasConfigs: []\n")
         z.writestr("templates/Namespace.yml.j2", "name: dummy-namespace\nlabels: []\ndeployParameters: {}\ndeployParameterSets: []\ne2eParameters: {}\ne2eParameterSets: []\ntechnicalConfigurationParameters: {}\ntechnicalConfigurationParameterSets: []\nisServerSideMerge: false\ncleanInstallApprovalRequired: false\nmergeDeployParametersAndE2EParameters: false\ncredentialsId: dummy\n")
 
-    # Create project-env-template artifact
     pet_dir = base_dir / "release" / "org" / "test" / "project-env-template" / "v1.2.3"
     pet_dir.mkdir(parents=True, exist_ok=True)
     with open(pet_dir / "project-env-template-v1.2.3.json", "w") as f:
@@ -52,17 +48,12 @@ def mock_nexus(tmp_path_factory):
         z.writestr("templates/Cloud.yml.j2", "name: dummy-cloud\nnamespacePrefix: dummy\ndeployParameters: {}\ndeployParameterSets: []\ne2eParameters: {}\ne2eParameterSets: []\ntechnicalConfigurationParameters: {}\ntechnicalConfigurationParameterSets: []\napiUrl: dummy\napiPort: 80\ndashboardUrl: dummy\nlabels: []\ndefaultCredentialsId: dummy\nprotocol: dummy\nmaasConfig: {credentialsId: dummy}\nvaultConfig: {credentialsId: dummy}\nconsulConfig: {credentialsId: dummy, tokenSecret: dummy}\ndbaasConfigs: []\n")
         z.writestr("templates/Namespace.yml.j2", "name: dummy-namespace\nlabels: []\ndeployParameters: {}\ndeployParameterSets: []\ne2eParameters: {}\ne2eParameterSets: []\ntechnicalConfigurationParameters: {}\ntechnicalConfigurationParameterSets: []\nisServerSideMerge: false\ncleanInstallApprovalRequired: false\nmergeDeployParametersAndE2EParameters: false\ncredentialsId: dummy\n")
 
-    # Start server
     proc = subprocess.Popen(["python3", "-m", "http.server", "8000", "-d", str(base_dir)])
-    time.sleep(1) # wait for server to start
+    time.sleep(1)
     yield
     proc.terminate()
     proc.wait()
 
 @pytest.fixture
 def workspace(tmp_path):
-    """
-    Provides an isolated EnvGene E2E test workspace instance.
-    This fixture abstracts the CI_PROJECT_DIR and handles test data generation.
-    """
     return EnvGeneWorkspace(tmp_path)

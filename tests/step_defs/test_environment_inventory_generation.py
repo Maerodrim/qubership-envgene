@@ -7,7 +7,6 @@ scenarios('../features/environment-inventory-generation.feature')
 
 @given('the target environment inventory file does not exist')
 def inv_does_not_exist(workspace):
-    # Setup by workspace automatically (clean tmp dir)
     pass
 
 @given('the target environment inventory file exists')
@@ -154,7 +153,6 @@ def pipeline_inv_content_fail(workspace):
     if not hasattr(workspace, 'extra_env'):
         workspace.extra_env = {}
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
-    # We expect this to fail, but run_pipeline does not throw, so we don't need check=False
     workspace.run_pipeline(extra_env=workspace.extra_env)
 
 @then('the pipeline fails')

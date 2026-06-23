@@ -18,7 +18,6 @@ class DataBuilder:
         for i in range(count):
             file_path = app_dir / f"{app_name}-v{i}.sbom.json"
 
-            # Use sparse file generation for the FIRST file to hit size limit instantly
             if i == 0 and size_mb > 0:
                 with open(file_path, "wb") as f:
                     f.seek(int(size_mb * 1024 * 1024) - 1)
@@ -26,7 +25,6 @@ class DataBuilder:
             else:
                 file_path.touch()
 
-            # Older files have smaller timestamps
             mod_time = base_time + (i * 100)
             os.utime(file_path, (mod_time, mod_time))
 
@@ -41,12 +39,10 @@ class DataBuilder:
 
     def create_regdef(self, app_name: str, content: dict = None):
         """Placeholder for creating RegDef files."""
-        # TODO: Add logic for regdefs
         pass
 
     def create_cloud_passport(self, app_name: str, content: dict = None):
         """Placeholder for creating Cloud Passports."""
-        # TODO: Add logic for passports
         pass
 
     def get_env_dir(self, cluster_name: str, env_name: str):
@@ -78,7 +74,6 @@ class DataBuilder:
         origin_dir.mkdir(parents=True, exist_ok=True)
         peer_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create namespace.yml for the plugin to read
         with open(origin_dir / "namespace.yml", "w") as f:
             yaml.dump({"name": origin_ns}, f)
         with open(peer_dir / "namespace.yml", "w") as f:
@@ -104,7 +99,7 @@ class DataBuilder:
             target = base_dir / cluster / env / "Inventory" / "parameters"
         elif place == "cluster":
             target = base_dir / cluster / "Inventory" / "parameters"
-        else: # site
+        else:
             target = base_dir / "Inventory" / "parameters"
         target.mkdir(parents=True, exist_ok=True)
         with open(target / f"{name}.yml", "w") as f:
@@ -117,7 +112,7 @@ class DataBuilder:
             target = base_dir / cluster / env / "Inventory" / "credentials"
         elif place == "cluster":
             target = base_dir / cluster / "Inventory" / "credentials"
-        else: # site
+        else:
             target = base_dir / "credentials"
         target.mkdir(parents=True, exist_ok=True)
         with open(target / f"{name}.yml", "w") as f:
@@ -130,7 +125,7 @@ class DataBuilder:
             target = base_dir / cluster / env / "Inventory" / "resource_profiles"
         elif place == "cluster":
             target = base_dir / cluster / "resource_profiles"
-        else: # site
+        else:
             target = base_dir / "resource_profiles"
         target.mkdir(parents=True, exist_ok=True)
         with open(target / f"{name}.yml", "w") as f:
@@ -143,7 +138,7 @@ class DataBuilder:
             target = base_dir / cluster / env / "shared-template-variables"
         elif place == "cluster":
             target = base_dir / cluster / "shared-template-variables"
-        else: # site
+        else:
             target = base_dir / "shared-template-variables"
         target.mkdir(parents=True, exist_ok=True)
         with open(target / f"{name}.yml", "w") as f:
@@ -151,9 +146,6 @@ class DataBuilder:
 
     def create_template_descriptor(self, cluster: str, env: str, namespaces: list):
         """Creates an env_template.yml descriptor mock for template generation."""
-        # For our tests, we will mock the template directory
-        # This typically lives alongside the pipeline or in an artifact.
-        # For integration testing ENV_BUILDER, we'll place it in the workspace so it can be 'downloaded' or read.
         td_dir = self.workspace.base_dir / "templates"
         td_dir.mkdir(parents=True, exist_ok=True)
 
@@ -161,7 +153,6 @@ class DataBuilder:
         with open(td_dir / "env_template.yml", "w") as f:
             yaml.dump(content, f)
 
-        # We need to configure the workspace config to point to this directory
         self.workspace.config_data["env_templates_dir"] = str(td_dir).replace('\\', '/')
 
     def create_artifact_def(self, app_name: str, content: dict):

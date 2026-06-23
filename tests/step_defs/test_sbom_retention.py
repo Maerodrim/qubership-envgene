@@ -1,12 +1,10 @@
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
-# Load scenarios
 scenarios('../features/sbom-retention.feature')
 
 @given('an Instance Repository exists with an "/sboms/" directory')
 def instance_repo_with_sboms_dir(workspace):
-    # Handled by workspace initialization
     pass
 
 @given(parsers.parse('SBOM files exist in "{path}"'))
@@ -47,7 +45,6 @@ def sbom_retention_enabled(workspace, count):
 
 @given(parsers.parse('the total size of "/sboms/" is {size:d} MB, which is below the 1200 MB limit'))
 def sbom_size_below_limit(workspace, size):
-    # To match the exact log output, we make one file 'size' MB large
     app_dir = list(workspace.sboms_dir.iterdir())[0]
     workspace.builder.modify_first_sbom_size(app_dir.name, size)
 
