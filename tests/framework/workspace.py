@@ -3,22 +3,23 @@ import subprocess
 import yaml
 from pathlib import Path
 from .data_builders import DataBuilder
+from .base_workspace import BaseWorkspace
 
-class EnvGeneWorkspace:
+class EnvGeneWorkspace(BaseWorkspace):
     def __init__(self, tmp_path):
-        self.base_dir = tmp_path
-        self.config_dir = self.base_dir / "configuration"
+        self._base_dir = tmp_path
+        self.config_dir = self._base_dir / "configuration"
         self.config_file = self.config_dir / "config.yml"
-        self.config_data = {}
+        self._config_data = {}
 
-        self.sboms_dir = self.base_dir / "sboms"
-        self.inventory_dir = self.base_dir / "inventory"
-        self.regdefs_dir = self.base_dir / "regdefs"
-        self.blueprints_dir = self.base_dir / "blueprints"
-        self.environments_dir = self.base_dir / "environments"
+        self._sboms_dir = self._base_dir / "sboms"
+        self.inventory_dir = self._base_dir / "inventory"
+        self.regdefs_dir = self._base_dir / "regdefs"
+        self.blueprints_dir = self._base_dir / "blueprints"
+        self.environments_dir = self._base_dir / "environments"
         self.creds_dir = self.config_dir / "credentials"
 
-        for d in [self.config_dir, self.creds_dir, self.sboms_dir, self.inventory_dir, self.regdefs_dir, self.blueprints_dir, self.environments_dir]:
+        for d in [self.config_dir, self.creds_dir, self._sboms_dir, self.inventory_dir, self.regdefs_dir, self.blueprints_dir, self.environments_dir]:
             d.mkdir(parents=True, exist_ok=True)
             
         with open(self.creds_dir / "credentials.yml", "w") as f:
@@ -27,10 +28,44 @@ class EnvGeneWorkspace:
         with open(self.config_dir / "registry.yml", "w") as f:
             yaml.dump({}, f)
 
-        self.stdout = ""
-        self.stderr = ""
+        self._stdout = ""
+        self._stderr = ""
+        self._returncode = 0
 
-        self.builder = DataBuilder(self)
+        self._builder = DataBuilder(self)
+
+    @property
+    def base_dir(self): return self._base_dir
+
+    @property
+    def sboms_dir(self): return self._sboms_dir
+
+    @property
+    def config_data(self): return self._config_data
+
+    @config_data.setter
+    def config_data(self, value): self._config_data = value
+
+    @property
+    def stdout(self): return self._stdout
+
+    @stdout.setter
+    def stdout(self, value): self._stdout = value
+
+    @property
+    def stderr(self): return self._stderr
+
+    @stderr.setter
+    def stderr(self, value): self._stderr = value
+
+    @property
+    def returncode(self): return self._returncode
+
+    @returncode.setter
+    def returncode(self, value): self._returncode = value
+
+    @property
+    def builder(self): return self._builder
 
     def write_config(self):
         with open(self.config_file, 'w') as f:
