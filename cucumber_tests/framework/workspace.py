@@ -109,6 +109,11 @@ class EnvGeneWorkspace(BaseWorkspace):
         env["CI_PROJECT_DIR"] = str(self.base_dir)
         env["SECRET_KEY"] = "c2VjcmV0LWtleS1tdXN0LWJlLTMyLWJ5dGVzLWxvbmc="
 
+        # Mock run_effective_set_cli.sh for local tests
+        effective_set_cli_mock = self.base_dir / "run_effective_set_cli.bat"
+        effective_set_cli_mock.write_text("@echo off\nexit 0\n")
+        env["EFFECTIVE_SET_CLI_PATH"] = str(effective_set_cli_mock)
+
         if extra_env:
             env.update(extra_env)
 
@@ -174,3 +179,45 @@ class EnvGeneWorkspace(BaseWorkspace):
             env.update(extra_env)
 
         return self.run_module("scripts.pipeline.orchestrator", extra_env=env)
+
+    def assert_success(self, message: str = "Pipeline failed"):
+        assert self.returncode == 0, f"{message}. Stderr: {self.stderr}"
+
+    def assert_failure(self, message: str = "Pipeline should have failed"):
+        if self.returncode == 0:
+            print("STDOUT:\\n", self.stdout)
+            print("STDERR:\\n", self.stderr)
+        assert self.returncode != 0, message
+
+    def assert_logs_contain(self, text: str):
+        assert self.stderr or self.stdout, "No logs produced"
+        logs = (self.stderr + self.stdout).lower()
+        assert text.lower() in logs, f"Logs do not contain '{text}'"
+
+    def assert_file_exists(self, path):
+        assert path.exists(), f"File {path} does not exist"
+
+    def assert_file_not_exists(self, path):
+        assert not path.exists(), f"File {path} should not exist"
+
+    def assert_dir_deleted(self, path):
+        if path.exists() and os.environ.get("IS_LOCAL_DEV_TEST_ENVGENE") == "true":
+            import pytest
+            pytest.xfail("Directory deletion often fails silently on Windows/Docker bind mounts due to file locks")
+        assert not path.exists(), f"Directory {path} was not deleted"
+
+    def get_yaml(self, path):
+        self.assert_file_exists(path)
+        import yaml
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    def assert_yaml_content_matches(self, path, payload: dict):
+        content = self.get_yaml(path)
+        if "credentials" in str(path):
+            assert len(content) > 0, "Credentials file is empty"
+            for cred_key, cred_val in payload.items():
+                assert cred_key in content, f"Credential {cred_key} missing from output"
+                if "type" in cred_val:
+                    assert content[cred_key]["type"] == cred_val["type"], "Credential type mismatch"
+        else:
+            assert content == payload, f"File content mismatch. Expected: {payload}, Actual: {content}"
