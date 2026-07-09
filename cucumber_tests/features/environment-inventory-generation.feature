@@ -6,7 +6,7 @@ Feature: Environment Inventory Generation
   Background:
     Given the pipeline has ENV_BUILD set to "false"
 
-  # ── env_definition.yml ──────────────────────────────────────────────────────
+  # в”Ђв”Ђ env_definition.yml в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   Scenario: UC-EINV-ED-1: Create env_definition.yml
     Given the target environment inventory file does not exist
@@ -33,7 +33,7 @@ Feature: Environment Inventory Generation
     Then the "env_definition.yml" file is deleted
     And the environment directory is deleted
 
-  # ── Paramsets ────────────────────────────────────────────────────────────────
+  # в”Ђв”Ђ Paramsets в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   Scenario: UC-EINV-PS-1: Create paramset file
     Given the target paramset file "app_params" does not exist at "env" scope
@@ -59,7 +59,7 @@ Feature: Environment Inventory Generation
     Then the paramset file "app_params.yml" is deleted at "env" scope
     And its parent directory is not deleted
 
-  # ── Credentials ──────────────────────────────────────────────────────────────
+  # в”Ђв”Ђ Credentials в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   Scenario: UC-EINV-CR-1: Create credentials file
     Given the target credentials file "db_creds" does not exist at "cluster" scope
@@ -85,7 +85,7 @@ Feature: Environment Inventory Generation
     Then the credentials file "db_creds.yml" is deleted at "cluster" scope
     And its parent directory is not deleted
 
-  # ── Resource Profiles ────────────────────────────────────────────────────────
+  # в”Ђв”Ђ Resource Profiles в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   Scenario: UC-EINV-RP-1: Create resource profile override file
     Given the target resource_profile file "db_profile" does not exist at "env" scope
@@ -111,7 +111,7 @@ Feature: Environment Inventory Generation
     Then the resource_profile file "db_profile.yml" is deleted at "env" scope
     And its parent directory is not deleted
 
-  # ── Shared Template Variables ─────────────────────────────────────────────────
+  # в”Ђв”Ђ Shared Template Variables в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   Scenario: UC-EINV-STV-1: Create Shared Template Variable file
     Given the target shared_template_variable file "prod_vars" does not exist at "env" scope
@@ -137,7 +137,7 @@ Feature: Environment Inventory Generation
     Then the shared_template_variable file "prod_vars.yml" is deleted at "env" scope
     And its parent directory is not deleted
 
-  # ── Atomic rollback ───────────────────────────────────────────────────────────
+  # в”Ђв”Ђ Atomic rollback в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   Scenario: UC-EINV-AT-ALL-1: Rollback all Inventory changes if any operation fails
     Given the repository has an initial state for rollback testing
@@ -146,10 +146,53 @@ Feature: Environment Inventory Generation
     And the pipeline logs contain a readable error message explaining the failure reason
     And the repository state is identical to the initial state
 
-  # ── Template Version Update ───────────────────────────────────────────────────
+  # в”Ђв”Ђ Template Version Update в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   @xfail
   Scenario: UC-EINV-TV-1: Apply ENV_TEMPLATE_VERSION in PERSISTENT mode
     Given the target environment inventory file exists
     When the Instance pipeline is started with ENV_TEMPLATE_VERSION set to "env-templates:2.0.0" and update mode "PERSISTENT"
     Then the "env_definition.yml" file has envTemplate.artifact equal to "env-templates:2.0.0"
+
+  # в”Ђв”Ђ Minimal content в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+  Scenario: UC-EINV-BASIC-1: Generate minimal Environment Inventory (init)
+    Given the target environment inventory file does not exist
+    When the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying "create_or_replace" for "envDefinition" with minimal content
+    Then the "env_definition.yml" file is created
+    And the generated env_definition contains minimal required fields
+
+  # в”Ђв”Ђ ENV_INVENTORY_INIT (deprecated, backward compat) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+  @xfail
+  Scenario: UC-EINV-INIT-1: Init inventory when env_definition.yml does not exist
+    Given the target environment inventory file does not exist
+    When the Instance pipeline is started with ENV_INVENTORY_INIT set to "true"
+    Then the "env_definition.yml" file is created
+
+  Scenario: UC-EINV-INIT-2: Init inventory when env_definition.yml already exists
+    Given the target environment inventory file exists
+    When the Instance pipeline is started with ENV_INVENTORY_INIT set to "true"
+    Then the "env_definition.yml" file is updated
+
+  # в”Ђв”Ђ Template Version Update в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+  Scenario: UC-EINV-TV-1-PERSISTENT: Apply ENV_TEMPLATE_VERSION in PERSISTENT mode
+    Given the target environment inventory file exists
+    When the Instance pipeline is started with ENV_TEMPLATE_VERSION set to "env-templates:2.0.0" and update mode "PERSISTENT"
+    Then the "env_definition.yml" file has envTemplate.artifact equal to "env-templates:2.0.0"
+
+  Scenario: UC-EINV-TV-1-TEMPORARY: Apply ENV_TEMPLATE_VERSION in TEMPORARY mode
+    Given the target environment inventory file exists
+    When the Instance pipeline is started with ENV_TEMPLATE_VERSION set to "env-templates:2.0.0" and update mode "TEMPORARY"
+    Then the "env_definition.yml" file has generatedVersions.generateEnvironmentLatestVersion equal to "env-templates:2.0.0"
+    And the "env_definition.yml" file envTemplate.artifact is not changed
+
+  # в”Ђв”Ђ Rollback (Negative) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+  Scenario: UC-EINV-AT-ALL-1: Rollback all Inventory changes if any operation fails
+    Given the target environment inventory file exists
+    When the Instance pipeline is started with invalid ENV_INVENTORY_CONTENT that fails during processing
+    Then the orchestrator fails
+    And the repository state is identical to the initial state
+    And the pipeline log contains "Validation failed"

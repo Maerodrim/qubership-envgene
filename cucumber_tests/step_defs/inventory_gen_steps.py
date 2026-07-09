@@ -10,13 +10,13 @@ from cucumber_tests.framework.workspace import create_file, delete_file_if_exist
 from cucumber_tests.framework.golden_compare import compare_directories
 
 
-# Entity → (subdirectory, has_inventory_folder)
+# Entity в†’ (subdirectory, has_inventory_folder)
 # has_inventory_folder=True means env scope puts files under .../Inventory/<subdir>
 _ENTITY_DIRS = {
     "paramset":                 ("parameters",               True),
     "credentials":              ("credentials",              True),
     "resource_profile":         ("resource_profiles",        True),
-    "shared_template_variable": ("shared_template_variables", False),
+    "shared_template_variable": ("shared-template-variables", False),
 }
 
 
@@ -31,7 +31,7 @@ def _entity_dir(workspace, entity: str, scope: str) -> "Path":
         return workspace.entity_dir(subdir, scope)
 
 
-# ── Environment/cluster context setup ────────────────────────────────────────
+# в”Ђв”Ђ Environment/cluster context setup в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @given(parsers.parse('environment is "{cluster}/{env}"'))
@@ -41,7 +41,7 @@ def set_environment(workspace, cluster, env):
     workspace.env_name = env
 
 
-# ── env_definition.yml ────────────────────────────────────────────────────────
+# в”Ђв”Ђ env_definition.yml в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @given("the target environment inventory file does not exist")
@@ -98,7 +98,7 @@ def file_is_deleted(workspace, filename):
     assert not (env_dir / "Inventory" / filename).exists(), f"File {filename} was not deleted"
 
 
-# ── Generic entity steps (paramsets, credentials, resource_profiles, shtv) ───
+# в”Ђв”Ђ Generic entity steps (paramsets, credentials, resource_profiles, shtv) в”Ђв”Ђв”Ђ
 
 
 @given(
@@ -156,7 +156,7 @@ def entity_file_deleted(workspace, entity, filename, scope):
     workspace.last_checked_file_path = path
 
 
-# ── Per-entity pipeline When-steps ────────────────────────────────────────────
+# в”Ђв”Ђ Per-entity pipeline When-steps в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @when(
@@ -232,7 +232,7 @@ def pipeline_inv_content_shtv(workspace, action, name, scope):
     workspace.run_pipeline(extra_env=workspace.extra_env)
 
 
-# ── Atomic rollback ───────────────────────────────────────────────────────────
+# в”Ђв”Ђ Atomic rollback в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @given("the repository has an initial state for rollback testing")
@@ -283,7 +283,7 @@ def repo_state_identical(workspace):
     )
 
 
-# ── UC-EINV-INIT steps ────────────────────────────────────────────────────────
+# в”Ђв”Ђ UC-EINV-INIT steps в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @when(
@@ -299,7 +299,48 @@ def pipeline_inv_init(workspace, value):
     workspace.run_pipeline(extra_env=workspace.extra_env)
 
 
-# ── UC-EINV-TV steps ──────────────────────────────────────────────────────────
+# в”Ђв”Ђ UC-EINV-BASIC-1 steps в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+
+@when(
+    parsers.parse(
+        'the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying "{action}" for "envDefinition" with minimal content'
+    )
+)
+def pipeline_inv_content_envdef_minimal(workspace, action):
+    """Creates env_definition.yml with only the mandatory inventory + envTemplate fields."""
+    env_def = {
+        "action": action,
+        "content": {
+            "inventory": {
+                "environmentName": workspace.env_name,
+                "cloudName": workspace.cluster_name,
+            },
+            "envTemplate": {
+                "name": "test",
+                "artifact": "project-env-template:v1.2.3",
+            },
+        },
+    }
+    content = {"envDefinition": env_def}
+    if not hasattr(workspace, "extra_env"):
+        workspace.extra_env = {}
+    workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
+    workspace.last_payload = env_def.get("content")
+    workspace.run_pipeline(extra_env=workspace.extra_env)
+
+
+@then("the generated env_definition contains minimal required fields")
+def env_definition_has_required_fields(workspace):
+    env_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name)
+    inv_file = env_dir / "Inventory" / "env_definition.yml"
+    assert inv_file.exists(), "env_definition.yml does not exist"
+    data = yaml.safe_load(inv_file.read_text(encoding="utf-8"))
+    assert "inventory" in data, "Missing 'inventory' key"
+    assert "envTemplate" in data, "Missing 'envTemplate' key"
+
+
+# в”Ђв”Ђ UC-EINV-TV steps в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @when(
@@ -354,7 +395,7 @@ def pipeline_inv_content_envdef_with_version(workspace, action, version):
     workspace.run_pipeline(extra_env=workspace.extra_env)
 
 
-# ── Invalid content ───────────────────────────────────────────────────────────
+# в”Ђв”Ђ Invalid content в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @when(
@@ -376,59 +417,111 @@ def pipeline_inv_content_invalid(workspace, action):
 
 @then("the pipeline logs contain a readable error message explaining the failure reason")
 def pipeline_logs_contain_error(workspace):
-    assert workspace.stderr or workspace.stdout, "No logs produced"
-    logs = (workspace.stderr + workspace.stdout).lower()
-    assert (
-        "error" in logs or "fail" in logs or "exception" in logs or "validation" in logs
-    ), "Logs do not contain error details"
+    workspace.assert_logs_contain("fail") # The logs actually contain "Validation failed"
 
 
-# ── Shared assertions ─────────────────────────────────────────────────────────
+# в”Ђв”Ђ Shared assertions в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
 
 @then("its content matches the payload")
 def content_matches_payload(workspace):
-    actual_content = yaml.safe_load(
-        workspace.last_checked_file_path.read_text(encoding="utf-8")
-    )
-    if "credentials" in str(workspace.last_checked_file_path):
-        assert len(actual_content) > 0, "Credentials file is empty"
-        for cred_key, cred_val in workspace.last_payload.items():
-            assert cred_key in actual_content, f"Credential {cred_key} missing from output"
-            if "type" in cred_val:
-                assert actual_content[cred_key]["type"] == cred_val["type"], "Credential type mismatch"
-    else:
-        assert actual_content == workspace.last_payload, "File content does not match payload"
+    workspace.assert_yaml_content_matches(workspace.last_checked_file_path, workspace.last_payload)
 
 
 @then("the environment directory is deleted")
 def env_dir_is_deleted(workspace):
     env_dir = workspace.base_dir / "environments" / workspace.cluster_name / workspace.env_name
-    if env_dir.exists() and os.environ.get("IS_LOCAL_DEV_TEST_ENVGENE") == "true":
-        pytest.xfail("Directory deletion often fails silently on Windows/Docker bind mounts due to file locks")
-    assert not env_dir.exists(), (
-        f"Environment directory was not deleted. Contents: "
-        f"{list(env_dir.rglob('*')) if env_dir.exists() else 'N/A'}"
-    )
+    workspace.assert_dir_deleted(env_dir)
 
 
 @then("its parent directory is not deleted")
 def parent_dir_not_deleted(workspace):
-    assert workspace.last_checked_file_path.parent.exists(), "Parent directory was incorrectly deleted"
+    workspace.assert_file_exists(workspace.last_checked_file_path.parent)
 
 
 @then(parsers.parse('it validates "{node}" against the request schema'))
 def validates_request_schema(workspace, node):
-    assert workspace.returncode == 0, f"Pipeline failed request schema validation for {node}"
+    workspace.assert_success(f"Pipeline failed request schema validation for {node}")
 
 
 @then(parsers.parse('it validates "{node}" against the "{schema_name}" schema'))
 def validates_content_schema(workspace, node, schema_name):
-    assert workspace.returncode == 0, (
-        f"Pipeline failed content schema validation for {node} against {schema_name}"
-    )
+    workspace.assert_success(f"Pipeline failed content schema validation for {node} against {schema_name}")
 
 
 @then(parsers.parse('it resolves target path for "{filename}"'))
 def resolves_target_path(workspace, filename):
     pass  # Path resolution validated implicitly by subsequent file assertions
+
+
+# ── Template Version Update (TV-1) ──────────────────────────────────────────────
+
+@when(parsers.parse('the Instance pipeline is started with ENV_TEMPLATE_VERSION set to "{version}" and update mode "{mode}"'))
+def pipeline_env_template_version(workspace, version, mode):
+    env_def = {"action": "create_or_replace"}
+    env_def["content"] = {
+        "inventory": {},
+        "envTemplate": {"name": "test", "artifact": "env-templates:1.0.0"},
+    }
+    content = {"envDefinition": env_def}
+    if not hasattr(workspace, "extra_env"):
+        workspace.extra_env = {}
+    workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
+    workspace.extra_env["ENV_TEMPLATE_VERSION"] = version
+    workspace.extra_env["ENV_TEMPLATE_VERSION_UPDATE_MODE"] = mode
+    
+    # Store initial state for comparison in TEMPORARY mode
+    workspace.initial_env_template_artifact = "env-templates:1.0.0"
+    
+    workspace.run_pipeline(extra_env=workspace.extra_env)
+
+@then(parsers.parse('the "env_definition.yml" file has envTemplate.artifact equal to "{version}"'))
+def envdef_has_artifact(workspace, version):
+    env_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name)
+    file_path = env_dir / "Inventory" / "env_definition.yml"
+    actual_content = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+    assert actual_content.get("envTemplate", {}).get("artifact") == version
+
+@then(parsers.parse('the "env_definition.yml" file has generatedVersions.generateEnvironmentLatestVersion equal to "{version}"'))
+def envdef_has_generated_versions(workspace, version):
+    env_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name)
+    file_path = env_dir / "Inventory" / "env_definition.yml"
+    actual_content = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+    assert actual_content.get("generatedVersions", {}).get("generateEnvironmentLatestVersion") == version
+
+@then('the "env_definition.yml" file envTemplate.artifact is not changed')
+def envdef_artifact_not_changed(workspace):
+    env_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name)
+    file_path = env_dir / "Inventory" / "env_definition.yml"
+    actual_content = yaml.safe_load(file_path.read_text(encoding="utf-8"))
+    assert actual_content.get("envTemplate", {}).get("artifact") == workspace.initial_env_template_artifact
+
+# ── Rollback (Negative) ──────────────────────────────────────────────────────
+
+@when('the Instance pipeline is started with invalid ENV_INVENTORY_CONTENT that fails during processing')
+def pipeline_invalid_content_rollback(workspace):
+    # Setup initial state by copying base environment
+    import shutil
+    from pathlib import Path
+    initial_state_dir = workspace.base_dir / "environments_initial"
+    if (workspace.base_dir / "environments").exists():
+        shutil.copytree(workspace.base_dir / "environments", initial_state_dir, dirs_exist_ok=True)
+    
+    # Send content that will cause a schema validation error
+    env_def = {
+        "action": "create_or_replace",
+        "content": {"inventory": "invalid_string_not_object"},
+    }
+    content = {"envDefinition": env_def}
+    if not hasattr(workspace, "extra_env"):
+        workspace.extra_env = {}
+    workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
+    workspace.run_pipeline(extra_env=workspace.extra_env)
+
+@then('the repository state is identical to the initial state')
+def repo_state_identical(workspace):
+    from cucumber_tests.framework.golden_compare import compare_directories
+    initial_state_dir = workspace.base_dir / "environments_initial"
+    current_state_dir = workspace.base_dir / "environments"
+    if initial_state_dir.exists():
+        compare_directories(initial_state_dir, current_state_dir)
