@@ -6,7 +6,12 @@ import yaml
 import shutil
 from pytest_bdd import given, parsers, then, when
 
-from cucumber_tests.framework.workspace import create_file, delete_file_if_exists
+from cucumber_tests.framework.workspace import (
+    TEST_ENV_DEFINITION_CONTENT,
+    TEST_YAML_CONTENT,
+    create_file,
+    delete_file_if_exists,
+)
 from cucumber_tests.framework.golden_compare import compare_directories
 
 
@@ -51,9 +56,9 @@ def inv_does_not_exist(workspace):
 
 @given("the target environment inventory file exists")
 def inv_exists(workspace):
-    workspace.builder.create_inventory_file(
-        workspace.cluster_name, workspace.env_name, {"envDefinition": {}}
-    )
+    inv_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name) / "Inventory"
+    inv_dir.mkdir(parents=True, exist_ok=True)
+    (inv_dir / "env_definition.yml").write_text(TEST_ENV_DEFINITION_CONTENT)
 
 
 @when(
@@ -238,9 +243,8 @@ def pipeline_inv_content_shtv(workspace, action, name, scope):
 @given("the repository has an initial state for rollback testing")
 def repo_has_initial_state(workspace):
     env_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name)
-    env_dir.mkdir(parents=True, exist_ok=True)
     (env_dir / "Inventory").mkdir(exist_ok=True)
-    (env_dir / "Inventory" / "env_definition.yml").write_text("old_content: true")
+    create_file(env_dir / "Inventory" / "env_definition.yml", TEST_ENV_DEFINITION_CONTENT)
 
     workspace.pre_run_snapshot_dir = workspace.base_dir.parent / "snapshot"
     if workspace.pre_run_snapshot_dir.exists():
@@ -345,37 +349,7 @@ def env_definition_has_required_fields(workspace):
 
 @when(
     parsers.parse(
-        'the Instance pipeline is started with ENV_TEMPLATE_VERSION set to "{version}" and update mode "{mode}"'
-    )
-)
-def pipeline_env_template_version(workspace, version, mode):
-    """Applies ENV_TEMPLATE_VERSION to an existing env_definition.yml."""
-    if not hasattr(workspace, "extra_env"):
-        workspace.extra_env = {}
-    workspace.extra_env["ENV_TEMPLATE_VERSION"] = version
-    workspace.extra_env["ENV_TEMPLATE_VERSION_UPDATE_MODE"] = mode
-    workspace.run_pipeline(extra_env=workspace.extra_env)
-
-
-@then(
-    parsers.parse(
-        'the "{filename}" file has envTemplate.artifact equal to "{expected_value}"'
-    )
-)
-def env_def_artifact_equals(workspace, filename, expected_value):
-    env_dir = workspace.builder.get_env_dir(workspace.cluster_name, workspace.env_name)
-    inv_file = env_dir / "Inventory" / filename
-    assert inv_file.exists(), f"{filename} does not exist"
-    data = yaml.safe_load(inv_file.read_text(encoding="utf-8"))
-    actual = data.get("envTemplate", {}).get("artifact")
-    assert actual == expected_value, (
-        f"envTemplate.artifact expected '{expected_value}', got '{actual}'"
-    )
-
-
-@when(
-    parsers.parse(
-        'the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying "{action}" for "envDefinition" and ENV_TEMPLATE_VERSION set to "{version}"'
+        'the Instance pipeline is started with ENV_INVENTORY_CONTENT specifying “{action}” for “envDefinition” and ENV_TEMPLATE_VERSION set to “{version}”'
     )
 )
 def pipeline_inv_content_envdef_with_version(workspace, action, version):
@@ -417,7 +391,12 @@ def pipeline_inv_content_invalid(workspace, action):
 
 @then("the pipeline logs contain a readable error message explaining the failure reason")
 def pipeline_logs_contain_error(workspace):
-    workspace.assert_logs_contain("fail") # The logs actually contain "Validation failed"
+    workspace.assert_logs_contain("Validation failed")
+
+
+@then(parsers.parse('the pipeline logs contain "{text}"'))
+def pipeline_logs_contain_text(workspace, text):
+    workspace.assert_logs_contain(text)
 
 
 # в”Ђв”Ђ Shared assertions в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
@@ -439,6 +418,11 @@ def parent_dir_not_deleted(workspace):
     workspace.assert_file_exists(workspace.last_checked_file_path.parent)
 
 
+@then("the pipeline succeeds")
+def pipeline_succeeds(workspace):
+    workspace.assert_success()
+
+
 @then(parsers.parse('it validates "{node}" against the request schema'))
 def validates_request_schema(workspace, node):
     workspace.assert_success(f"Pipeline failed request schema validation for {node}")
@@ -447,11 +431,6 @@ def validates_request_schema(workspace, node):
 @then(parsers.parse('it validates "{node}" against the "{schema_name}" schema'))
 def validates_content_schema(workspace, node, schema_name):
     workspace.assert_success(f"Pipeline failed content schema validation for {node} against {schema_name}")
-
-
-@then(parsers.parse('it resolves target path for "{filename}"'))
-def resolves_target_path(workspace, filename):
-    pass  # Path resolution validated implicitly by subsequent file assertions
 
 
 # ── Template Version Update (TV-1) ──────────────────────────────────────────────
@@ -469,10 +448,7 @@ def pipeline_env_template_version(workspace, version, mode):
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
     workspace.extra_env["ENV_TEMPLATE_VERSION"] = version
     workspace.extra_env["ENV_TEMPLATE_VERSION_UPDATE_MODE"] = mode
-    
-    # Store initial state for comparison in TEMPORARY mode
     workspace.initial_env_template_artifact = "env-templates:1.0.0"
-    
     workspace.run_pipeline(extra_env=workspace.extra_env)
 
 @then(parsers.parse('the "env_definition.yml" file has envTemplate.artifact equal to "{version}"'))
@@ -500,14 +476,11 @@ def envdef_artifact_not_changed(workspace):
 
 @when('the Instance pipeline is started with invalid ENV_INVENTORY_CONTENT that fails during processing')
 def pipeline_invalid_content_rollback(workspace):
-    # Setup initial state by copying base environment
-    import shutil
-    from pathlib import Path
-    initial_state_dir = workspace.base_dir / "environments_initial"
-    if (workspace.base_dir / "environments").exists():
-        shutil.copytree(workspace.base_dir / "environments", initial_state_dir, dirs_exist_ok=True)
-    
-    # Send content that will cause a schema validation error
+    workspace.pre_run_snapshot_dir = workspace.base_dir.parent / "snapshot_neg"
+    if workspace.pre_run_snapshot_dir.exists():
+        shutil.rmtree(workspace.pre_run_snapshot_dir)
+    shutil.copytree(workspace.base_dir, workspace.pre_run_snapshot_dir)
+
     env_def = {
         "action": "create_or_replace",
         "content": {"inventory": "invalid_string_not_object"},
@@ -517,11 +490,3 @@ def pipeline_invalid_content_rollback(workspace):
         workspace.extra_env = {}
     workspace.extra_env["ENV_INVENTORY_CONTENT"] = json.dumps(content)
     workspace.run_pipeline(extra_env=workspace.extra_env)
-
-@then('the repository state is identical to the initial state')
-def repo_state_identical(workspace):
-    from cucumber_tests.framework.golden_compare import compare_directories
-    initial_state_dir = workspace.base_dir / "environments_initial"
-    current_state_dir = workspace.base_dir / "environments"
-    if initial_state_dir.exists():
-        compare_directories(initial_state_dir, current_state_dir)

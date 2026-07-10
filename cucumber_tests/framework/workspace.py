@@ -5,6 +5,15 @@ from pathlib import Path
 from .data_builders import DataBuilder
 from .base_workspace import BaseWorkspace
 
+_TEST_DATA_DIR = Path(__file__).parent.parent / "test_data" / "einv" / "common"
+
+PLACEHOLDER_FILE = _TEST_DATA_DIR / "placeholder.yml"
+ENV_DEFINITION_FILE = _TEST_DATA_DIR / "env_definition.yml"
+
+TEST_YAML_CONTENT = PLACEHOLDER_FILE.read_text(encoding="utf-8")
+TEST_ENV_DEFINITION_CONTENT = ENV_DEFINITION_FILE.read_text(encoding="utf-8")
+
+
 def delete_file_if_exists(path: Path) -> None:
     """Remove a file if it exists, then assert it is gone."""
     if path.exists():
@@ -12,7 +21,7 @@ def delete_file_if_exists(path: Path) -> None:
     assert not path.exists()
 
 
-def create_file(path: Path, content: str = "name: test") -> None:
+def create_file(path: Path, content: str = TEST_YAML_CONTENT) -> None:
     """Create a file (including parent dirs) with the given text content."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
@@ -201,9 +210,6 @@ class EnvGeneWorkspace(BaseWorkspace):
         assert not path.exists(), f"File {path} should not exist"
 
     def assert_dir_deleted(self, path):
-        if path.exists() and os.environ.get("IS_LOCAL_DEV_TEST_ENVGENE") == "true":
-            import pytest
-            pytest.xfail("Directory deletion often fails silently on Windows/Docker bind mounts due to file locks")
         assert not path.exists(), f"Directory {path} was not deleted"
 
     def get_yaml(self, path):
